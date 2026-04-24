@@ -419,24 +419,29 @@ export default function BlogAdminPage() {
         )}
       </div>
 
-      {/* Auto-Generate from RSS */}
-      <div className="bg-gradient-to-r from-gray-50 to-gray-100 border border-gray-200 rounded-xl p-6">
+      {/* Auto-Generate from @TheFestiveOwl */}
+      <div className="bg-gradient-to-r from-zinc-900 to-zinc-800 border border-zinc-700 rounded-xl p-6">
         <div className="text-center">
-          <h2 className="font-semibold text-gray-900 mb-2">Auto-Generate from News</h2>
-          <p className="text-gray-600 text-sm mb-4">
-            Pull latest from Dancing Astronaut, Mixmag, Billboard Dance and generate a post
+          <h2 className="font-semibold text-white mb-2">@TheFestiveOwl Pipeline</h2>
+          <p className="text-zinc-400 text-sm mb-4">
+            Pull the last 3 tweets from @TheFestiveOwl and generate blog posts from each
           </p>
           <Button 
             onClick={async () => {
               setGenerating(true)
               setError(null)
+              setSuccess(null)
               try {
-                const res = await fetch('/api/cron/generate-blogs?test=true', { method: 'POST' })
+                const res = await fetch('/api/cron/generate-blogs?test=true&limit=3', { method: 'POST' })
                 const data = await res.json()
                 if (data.error) {
-                  setError(data.error)
+                  setError(data.error + (data.details ? `: ${data.details}` : ''))
                 } else if (data.success) {
-                  setSuccess(`Auto-generated: ${data.post?.title || 'New post created'}`)
+                  const count = data.posts_created || 1
+                  setSuccess(`Generated ${count} post${count > 1 ? 's' : ''} from @TheFestiveOwl`)
+                  await checkStatus()
+                } else if (data.message) {
+                  setSuccess(data.message)
                 }
               } catch (err) {
                 setError(err instanceof Error ? err.message : 'Unknown error')
@@ -445,21 +450,23 @@ export default function BlogAdminPage() {
               }
             }}
             disabled={generating}
-            variant="outline"
-            className="border-gray-300"
+            className="bg-red-600 hover:bg-red-700 text-white"
           >
             {generating ? (
               <>
                 <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                Generating...
+                Fetching tweets & generating...
               </>
             ) : (
               <>
                 <Sparkles className="w-4 h-4 mr-2" />
-                Generate from RSS
+                Test: Generate from Last 3 Tweets
               </>
             )}
           </Button>
+          <p className="text-zinc-500 text-xs mt-3">
+            Source: nitter.poast.org/TheFestiveOwl/rss
+          </p>
         </div>
       </div>
     </div>

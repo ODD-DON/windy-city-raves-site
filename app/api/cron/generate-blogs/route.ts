@@ -296,6 +296,60 @@ async function saveBlogPost(post: {
   return response.json()
 }
 
+// Helper to generate and save a post from a single tweet
+async function generateFromTweet(tweet: Tweet): Promise<{ success: boolean; slug?: string; title?: string; error?: string }> {
+  try {
+    // Generate blog post
+    const blogPost = await generateBlogPost(tweet)
+    
+    // Get image
+    let finalImageUrl: string
+    let imageCredit: string
+    
+    if (tweet.imageUrl) {
+      const isValid = await isImageValid(tweet.imageUrl)
+      if (isValid) {
+        finalImageUrl = tweet.imageUrl
+        imageCredit = '@TheFestiveOwl'
+      } else {
+        finalImageUrl = getUnsplashFallback(blogPost.title)
+        imageCredit = 'Unsplash'
+      }
+    } else {
+      finalImageUrl = getUnsplashFallback(blogPost.title)
+      imageCredit = 'Unsplash'
+    }
+    
+    // Generate slug
+    const slug = blogPost.title
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/^-|-$/g, '')
+      .substring(0, 60) + '-' + Date.now().toString(36)
+    
+    // Save to Supabase
+    await saveBlogPost({
+      slug,
+      title: blogPost.title,
+      excerpt: blogPost.excerpt,
+      content: blogPost.content,
+      metaTitle: blogPost.metaTitle,
+      metaDescription: blogPost.metaDescription,
+      keywords: blogPost.keywords,
+      category: blogPost.category,
+      tags: blogPost.tags,
+      imageUrl: finalImageUrl,
+      imageCredit,
+      tweetId: tweet.id
+    })
+    
+    return { success: true, slug, title: blogPost.title }
+  } catch (error) {
+    console.error(`Error generating from tweet ${tweet.id}:`, error)
+    return { success: false, error: error instanceof Error ? error.message : 'Unknown error' }
+  }
+}
+
 // GET handler for Vercel Cron
 export async function GET(req: NextRequest) {
   const authHeader = req.headers.get('authorization')
@@ -427,34 +481,81 @@ export async function GET(req: NextRequest) {
 export async function POST(req: NextRequest) {
   const url = new URL(req.url)
   const isTest = url.searchParams.get('test') === 'true'
+  const limit = parseInt(url.searchParams.get('limit') || '1', 10)
   
   if (!isTest) {
-    const authHeader = req.headers.get('authorization')
-    const cronSecret = process.env.CRON_SECRET
-    
-    if (cronSecret && authHeader !== `Bearer ${cronSecret}`) {
-      return Response.json({ error: 'Unauthorized' }, { status: 401 })
-    }
+  const authHeader = req.headers.get('authorization')
+  const cronSecret = process.env.CRON_SECRET
+  
+  if (cronSecret && authHeader !== `Bearer ${cronSecret}`) {
+  return Response.json({ error: 'Unauthorized' }, { status: 401 })
   }
-
+  }
+  
   try {
-    // Fetch latest tweets
-    const tweets = await fetchFestiveOwlTweets()
+  // Fetch latest tweets
+  const tweets = await fetchFestiveOwlTweets()
+  
+  if (tweets.length === 0) {
+  return Response.json({
+  success: false,
+  message: 'No tweets found from @TheFestiveOwl',
+  feed_url: FESTIVE_OWL_RSS
+  })
+  }
+  
+  // If limit > 1, process multiple tweets
+  if (limit > 1) {
+    const postsCreated: { slug: string; title: string; tweet_id: string }[] = []
+    const tweetsToProcess: Tweet[] = []
     
-    if (tweets.length === 0) {
-      return Response.json({ 
-        success: false, 
-        message: 'No tweets found from @TheFestiveOwl',
-        feed_url: FESTIVE_OWL_RSS
+    // Find unprocessed tweets up to limit
+    for (const tweet of tweets.slice(0, limit + 2)) {
+      const processed = await isTweetProcessed(tweet.id)
+      if (!processed && tweetsToProcess.length < limit) {
+        tweetsToProcess.push(tweet)
+      }
+    }
+    
+    if (tweetsToProcess.length === 0) {
+      return Response.json({
+        success: false,
+        message: 'All recent tweets have already been processed',
+        tweets_checked: tweets.slice(0, limit + 2).map(t => t.id)
       })
     }
-
-    // Find first unprocessed tweet
-    let selectedTweet: Tweet | null = null
-    for (const tweet of tweets) {
-      const processed = await isTweetProcessed(tweet.id)
-      if (!processed) {
-        selectedTweet = tweet
+    
+    // Process each tweet
+    for (const tweet of tweetsToProcess) {
+      try {
+        const result = await generateFromTweet(tweet)
+        if (result.success) {
+          postsCreated.push({
+            slug: result.slug!,
+            title: result.title!,
+            tweet_id: tweet.id
+          })
+        }
+      } catch (err) {
+        console.error(`Failed to process tweet ${tweet.id}:`, err)
+      }
+    }
+    
+    return Response.json({
+      success: postsCreated.length > 0,
+      posts_created: postsCreated.length,
+      posts: postsCreated,
+      tweets_processed: tweetsToProcess.map(t => t.id)
+    })
+  }
+  
+  // Single tweet mode (original behavior)
+  // Find first unprocessed tweet
+  let selectedTweet: Tweet | null = null
+  for (const tweet of tweets) {
+  const processed = await isTweetProcessed(tweet.id)
+  if (!processed) {
+  selectedTweet = tweet
         break
       }
     }
