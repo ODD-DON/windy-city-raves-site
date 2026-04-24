@@ -1,474 +1,541 @@
 'use client'
 
-import { useState, useRef } from 'react'
+import { useState, useEffect } from 'react'
 import { Button } from '@/components/ui/button'
-import { Loader2, Sparkles, RefreshCw, Search, Edit3, Eye, Send, X, CheckCircle } from 'lucide-react'
+import { Loader2, Plus, Edit3, Trash2, Eye, Save, X, Search } from 'lucide-react'
 import Image from 'next/image'
+import { createClient } from '@/lib/supabase/client'
 
 interface BlogPost {
-  title: string
+  id: string
   slug: string
+  title: string
   excerpt: string
   content: string
   category: string
-  tags: string[]
-  keywords: string[]
-  meta_title: string
-  meta_description: string
-  image_url: string
-  image_credit: string
-  format_detected?: string
-  original_topic?: string
+  tags: string[] | null
+  keywords: string[] | null
+  meta_title: string | null
+  meta_description: string | null
+  image_url: string | null
+  image_credit: string | null
+  status: string
+  published_at: string | null
+  created_at: string
 }
 
-interface GenerationStatus {
-  date: string
-  posts_generated: number
-  topics_used: string[]
-  remaining: number
-}
-
-const formatLabels: Record<string, string> = {
-  list: 'Ranked List',
-  checklist: 'Checklist',
-  guide: 'How-To Guide',
-  editorial: 'Editorial'
-}
-
-const formatColors: Record<string, string> = {
-  list: 'bg-purple-100 text-purple-700',
-  checklist: 'bg-green-100 text-green-700',
-  guide: 'bg-blue-100 text-blue-700',
-  editorial: 'bg-gray-100 text-gray-700'
-}
+const categories = [
+  { value: 'scene-news', label: 'Scene News' },
+  { value: 'artist-spotlight', label: 'Artist Spotlight' },
+  { value: 'event-preview', label: 'Event Preview' },
+  { value: 'event-recap', label: 'Event Recap' },
+  { value: 'venue-guide', label: 'Venue Guide' },
+  { value: 'festival-news', label: 'Festival News' },
+  { value: 'industry-news', label: 'Industry News' },
+]
 
 export default function BlogAdminPage() {
-  const [generating, setGenerating] = useState(false)
-  const [publishing, setPublishing] = useState(false)
-  const [status, setStatus] = useState<GenerationStatus | null>(null)
+  const [posts, setPosts] = useState<BlogPost[]>([])
+  const [loading, setLoading] = useState(true)
+  const [saving, setSaving] = useState(false)
+  const [deleting, setDeleting] = useState<string | null>(null)
+  const [searchTerm, setSearchTerm] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [success, setSuccess] = useState<string | null>(null)
   
-  // Manual generator state
-  const [topic, setTopic] = useState('')
-  const [preview, setPreview] = useState<BlogPost | null>(null)
-  const [editMode, setEditMode] = useState(false)
-  const [editedTitle, setEditedTitle] = useState('')
-  const [editedContent, setEditedContent] = useState('')
-  const contentRef = useRef<HTMLDivElement>(null)
+  // Editor state
+  const [editingPost, setEditingPost] = useState<BlogPost | null>(null)
+  const [isCreating, setIsCreating] = useState(false)
+  
+  // Form state
+  const [formData, setFormData] = useState({
+    title: '',
+    slug: '',
+    excerpt: '',
+    content: '',
+    category: 'scene-news',
+    tags: '',
+    image_url: '',
+    image_credit: '',
+    meta_title: '',
+    meta_description: '',
+  })
 
-  const checkStatus = async () => {
+  const supabase = createClient()
+
+  useEffect(() => {
+    fetchPosts()
+  }, [])
+
+  const fetchPosts = async () => {
+    setLoading(true)
     try {
-      const today = new Date().toISOString().split('T')[0]
-      const res = await fetch(`${process.env.NEXT_PUBLIC_SUPABASE_URL}/rest/v1/wcr_blog_generation_log?date=eq.${today}`, {
-        headers: {
-          'apikey': process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '',
-        }
-      })
-      const logs = await res.json()
-      const todayLog = logs[0]
-      setStatus({
-        date: today,
-        posts_generated: todayLog?.posts_generated || 0,
-        topics_used: todayLog?.topics_used || [],
-        remaining: 3 - (todayLog?.posts_generated || 0)
-      })
+      const { data, error } = await supabase
+        .from('wcr_blog_posts')
+        .select('*')
+        .order('created_at', { ascending: false })
+      
+      if (error) throw error
+      setPosts(data || [])
     } catch (err) {
-      console.error('Failed to check status:', err)
+      setError(err instanceof Error ? err.message : 'Failed to fetch posts')
+    } finally {
+      setLoading(false)
     }
   }
 
-  const generateFromTopic = async () => {
-    if (!topic.trim() || topic.trim().length < 5) {
-      setError('Topic must be at least 5 characters')
+  const generateSlug = (title: string) => {
+    return title
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/^-|-$/g, '')
+      .substring(0, 60) + '-' + Date.now().toString(36)
+  }
+
+  const startCreating = () => {
+    setIsCreating(true)
+    setEditingPost(null)
+    setFormData({
+      title: '',
+      slug: '',
+      excerpt: '',
+      content: '',
+      category: 'scene-news',
+      tags: '',
+      image_url: '',
+      image_credit: '',
+      meta_title: '',
+      meta_description: '',
+    })
+  }
+
+  const startEditing = (post: BlogPost) => {
+    setEditingPost(post)
+    setIsCreating(false)
+    setFormData({
+      title: post.title,
+      slug: post.slug,
+      excerpt: post.excerpt,
+      content: post.content,
+      category: post.category,
+      tags: post.tags?.join(', ') || '',
+      image_url: post.image_url || '',
+      image_credit: post.image_credit || '',
+      meta_title: post.meta_title || '',
+      meta_description: post.meta_description || '',
+    })
+  }
+
+  const cancelEditing = () => {
+    setEditingPost(null)
+    setIsCreating(false)
+    setError(null)
+  }
+
+  const handleSave = async () => {
+    if (!formData.title.trim()) {
+      setError('Title is required')
       return
     }
     
-    setGenerating(true)
-    setError(null)
-    setSuccess(null)
-    setPreview(null)
-    
-    try {
-      const res = await fetch('/api/generate-blog-manual', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ topic: topic.trim() })
-      })
-      
-      const data = await res.json()
-      
-      if (data.error) {
-        setError(data.error + (data.details ? `: ${data.details}` : ''))
-      } else if (data.success && data.post) {
-        setPreview({
-          ...data.post,
-          original_topic: topic.trim()
-        })
-        setEditedTitle(data.post.title)
-        setEditedContent(data.post.content)
-      }
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Unknown error')
-    } finally {
-      setGenerating(false)
-    }
-  }
-
-  const publishPost = async () => {
-    if (!preview) return
-    
-    setPublishing(true)
+    setSaving(true)
     setError(null)
     
     try {
-      const postToPublish = {
-        ...preview,
-        title: editedTitle || preview.title,
-        content: editedContent || preview.content,
+      const slug = formData.slug || generateSlug(formData.title)
+      const tags = formData.tags.split(',').map(t => t.trim()).filter(Boolean)
+      
+      const postData = {
+        title: formData.title,
+        slug,
+        excerpt: formData.excerpt,
+        content: formData.content,
+        category: formData.category,
+        tags,
+        image_url: formData.image_url || null,
+        image_credit: formData.image_credit || null,
+        meta_title: formData.meta_title || formData.title,
+        meta_description: formData.meta_description || formData.excerpt,
+        keywords: tags,
+        status: 'published',
+        published_at: new Date().toISOString(),
       }
       
-      const res = await fetch('/api/generate-blog-manual', {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(postToPublish)
-      })
-      
-      const data = await res.json()
-      
-      if (data.error) {
-        setError(data.error + (data.details ? `: ${data.details}` : ''))
-      } else if (data.success) {
-        setSuccess(`Published! View at /blog/${preview.slug}`)
-        setPreview(null)
-        setTopic('')
-        setEditMode(false)
-        await checkStatus()
-      }
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Unknown error')
-    } finally {
-      setPublishing(false)
-    }
-  }
-
-  const cancelPreview = () => {
-    setPreview(null)
-    setEditMode(false)
-    setEditedTitle('')
-    setEditedContent('')
-  }
-
-  return (
-    <div className="max-w-5xl mx-auto py-8 px-4">
-      <div className="mb-8">
-        <h1 className="text-2xl font-bold text-gray-900 mb-2">Blog Content Generator</h1>
-        <p className="text-gray-600">Generate AI-powered blog posts about Chicago EDM scene</p>
-      </div>
-
-      {/* Manual Generator */}
-      <div className="bg-white border border-gray-200 rounded-xl p-6 mb-6">
-        <h2 className="font-semibold text-gray-900 mb-4 flex items-center gap-2">
-          <Edit3 className="w-5 h-5 text-red-600" />
-          Write a Custom Post
-        </h2>
+      if (editingPost) {
+        // Update existing post
+        const { error } = await supabase
+          .from('wcr_blog_posts')
+          .update(postData)
+          .eq('id', editingPost.id)
         
-        <div className="space-y-4">
+        if (error) throw error
+        setSuccess('Post updated successfully')
+      } else {
+        // Create new post
+        const { error } = await supabase
+          .from('wcr_blog_posts')
+          .insert(postData)
+        
+        if (error) throw error
+        setSuccess('Post created successfully')
+      }
+      
+      await fetchPosts()
+      cancelEditing()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to save post')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const handleDelete = async (post: BlogPost) => {
+    if (!confirm(`Delete "${post.title}"? This cannot be undone.`)) return
+    
+    setDeleting(post.id)
+    setError(null)
+    
+    try {
+      const { error } = await supabase
+        .from('wcr_blog_posts')
+        .delete()
+        .eq('id', post.id)
+      
+      if (error) throw error
+      setSuccess('Post deleted')
+      await fetchPosts()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to delete post')
+    } finally {
+      setDeleting(null)
+    }
+  }
+
+  const filteredPosts = posts.filter(post =>
+    post.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    post.category.toLowerCase().includes(searchTerm.toLowerCase())
+  )
+
+  // Editor View
+  if (isCreating || editingPost) {
+    return (
+      <div className="max-w-4xl mx-auto py-8 px-4">
+        <div className="flex items-center justify-between mb-6">
+          <h1 className="text-2xl font-bold text-gray-900">
+            {editingPost ? 'Edit Post' : 'Create New Post'}
+          </h1>
+          <Button variant="outline" onClick={cancelEditing}>
+            <X className="w-4 h-4 mr-2" />
+            Cancel
+          </Button>
+        </div>
+
+        {error && (
+          <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-6">
+            <p className="text-red-700">{error}</p>
+          </div>
+        )}
+
+        <div className="bg-white border border-gray-200 rounded-xl p-6 space-y-6">
+          {/* Title */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">Title *</label>
+            <input
+              type="text"
+              value={formData.title}
+              onChange={(e) => setFormData({ ...formData, title: e.target.value })}
+              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-red-500 text-gray-900 text-xl font-semibold"
+              placeholder="Your post title"
+            />
+          </div>
+
+          {/* Slug */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
-              What should the post be about?
+              Slug (leave blank to auto-generate)
             </label>
-            <div className="flex gap-3">
+            <input
+              type="text"
+              value={formData.slug}
+              onChange={(e) => setFormData({ ...formData, slug: e.target.value })}
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 text-gray-900 font-mono text-sm"
+              placeholder="your-post-slug"
+            />
+          </div>
+
+          {/* Category */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">Category</label>
+            <select
+              value={formData.category}
+              onChange={(e) => setFormData({ ...formData, category: e.target.value })}
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 text-gray-900"
+            >
+              {categories.map(cat => (
+                <option key={cat.value} value={cat.value}>{cat.label}</option>
+              ))}
+            </select>
+          </div>
+
+          {/* Excerpt */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">Excerpt</label>
+            <textarea
+              value={formData.excerpt}
+              onChange={(e) => setFormData({ ...formData, excerpt: e.target.value })}
+              rows={2}
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 text-gray-900"
+              placeholder="A short summary for previews and social sharing"
+            />
+          </div>
+
+          {/* Content */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">Content (HTML)</label>
+            <textarea
+              value={formData.content}
+              onChange={(e) => setFormData({ ...formData, content: e.target.value })}
+              rows={15}
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 text-gray-900 font-mono text-sm"
+              placeholder="<p>Your content here...</p>"
+            />
+            <p className="mt-1 text-xs text-gray-500">
+              Use HTML tags: &lt;p&gt; for paragraphs, &lt;h2&gt; for headings, &lt;strong&gt; for bold, &lt;em&gt; for italic
+            </p>
+          </div>
+
+          {/* Image */}
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Image URL</label>
               <input
                 type="text"
-                value={topic}
-                onChange={(e) => setTopic(e.target.value)}
-                placeholder="e.g. top ten sets to see at Electric Forest"
-                className="flex-1 px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-red-500 text-gray-900"
-                onKeyDown={(e) => e.key === 'Enter' && !generating && generateFromTopic()}
+                value={formData.image_url}
+                onChange={(e) => setFormData({ ...formData, image_url: e.target.value })}
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 text-gray-900"
+                placeholder="https://..."
               />
-              <Button 
-                onClick={generateFromTopic} 
-                disabled={generating || !topic.trim()}
-                className="bg-red-600 hover:bg-red-700 text-white px-6"
-              >
-                {generating ? (
-                  <>
-                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                    Searching & Writing...
-                  </>
-                ) : (
-                  <>
-                    <Search className="w-4 h-4 mr-2" />
-                    Generate
-                  </>
-                )}
-              </Button>
             </div>
-          </div>
-          
-          <div className="flex flex-wrap gap-2 text-sm">
-            <span className="text-gray-500">Try:</span>
-            {[
-              'top ten sets to see at Electric Forest',
-              'Electric Forest packing checklist',
-              'best Chicago techno tracks this month',
-              'first time at Spybar guide'
-            ].map((example) => (
-              <button
-                key={example}
-                onClick={() => setTopic(example)}
-                className="px-3 py-1 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-full transition-colors"
-              >
-                {example}
-              </button>
-            ))}
-          </div>
-          
-          <p className="text-xs text-gray-500">
-            AI auto-detects format: &quot;top ten&quot; = ranked list, &quot;checklist&quot; = checkbox list, &quot;guide/how to&quot; = step-by-step, else = editorial
-          </p>
-        </div>
-      </div>
-
-      {/* Error Display */}
-      {error && (
-        <div className="bg-red-50 border border-red-200 rounded-xl p-4 mb-6">
-          <p className="text-red-700 font-medium">Error</p>
-          <p className="text-red-600 text-sm">{error}</p>
-        </div>
-      )}
-
-      {/* Success Display */}
-      {success && (
-        <div className="bg-green-50 border border-green-200 rounded-xl p-4 mb-6 flex items-center gap-3">
-          <CheckCircle className="w-5 h-5 text-green-600" />
-          <div>
-            <p className="text-green-700 font-medium">Success!</p>
-            <p className="text-green-600 text-sm">{success}</p>
-          </div>
-        </div>
-      )}
-
-      {/* Preview */}
-      {preview && (
-        <div className="bg-white border-2 border-red-200 rounded-xl overflow-hidden mb-6">
-          {/* Preview Header */}
-          <div className="bg-red-50 px-6 py-4 border-b border-red-200 flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <Eye className="w-5 h-5 text-red-600" />
-              <span className="font-semibold text-gray-900">Preview</span>
-              {preview.format_detected && (
-                <span className={`text-xs font-medium px-2 py-1 rounded ${formatColors[preview.format_detected] || 'bg-gray-100 text-gray-700'}`}>
-                  {formatLabels[preview.format_detected] || preview.format_detected}
-                </span>
-              )}
-            </div>
-            <div className="flex items-center gap-2">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setEditMode(!editMode)}
-              >
-                <Edit3 className="w-4 h-4 mr-1" />
-                {editMode ? 'Preview' : 'Edit'}
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={cancelPreview}
-              >
-                <X className="w-4 h-4" />
-              </Button>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Image Credit</label>
+              <input
+                type="text"
+                value={formData.image_credit}
+                onChange={(e) => setFormData({ ...formData, image_credit: e.target.value })}
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 text-gray-900"
+                placeholder="Unsplash"
+              />
             </div>
           </div>
 
-          {/* Hero Image */}
-          {preview.image_url && (
-            <div className="relative h-64 bg-gray-100">
+          {/* Preview image */}
+          {formData.image_url && (
+            <div className="relative h-48 bg-gray-100 rounded-lg overflow-hidden">
               <Image
-                src={preview.image_url}
-                alt={preview.title}
+                src={formData.image_url}
+                alt="Preview"
                 fill
                 className="object-cover"
                 unoptimized
               />
-              <div className="absolute bottom-2 right-2 text-white/80 text-xs bg-black/50 px-2 py-1 rounded">
-                {preview.image_credit}
-              </div>
             </div>
           )}
 
-          {/* Content */}
-          <div className="p-6">
-            {editMode ? (
-              <div className="space-y-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Title</label>
-                  <input
-                    type="text"
-                    value={editedTitle}
-                    onChange={(e) => setEditedTitle(e.target.value)}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 text-gray-900 font-serif text-xl"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Content (HTML)</label>
-                  <textarea
-                    value={editedContent}
-                    onChange={(e) => setEditedContent(e.target.value)}
-                    rows={20}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 text-gray-900 font-mono text-sm"
-                  />
-                </div>
-              </div>
-            ) : (
-              <div>
-                <div className="mb-4">
-                  <span className="text-xs font-medium text-red-600 uppercase bg-red-50 px-2 py-1 rounded">
-                    {preview.category}
-                  </span>
-                </div>
-                <h2 className="font-serif text-3xl font-bold text-gray-900 mb-3">
-                  {editedTitle || preview.title}
-                </h2>
-                <p className="text-gray-600 mb-6 text-lg">{preview.excerpt}</p>
-                
-                <div 
-                  ref={contentRef}
-                  className="prose prose-lg max-w-none
-                    prose-headings:font-serif prose-headings:font-bold
-                    prose-h2:text-2xl prose-h2:mt-8 prose-h2:mb-4
-                    prose-p:mb-6 prose-p:leading-relaxed prose-p:text-gray-800
-                    prose-strong:text-gray-900
-                    prose-blockquote:border-l-4 prose-blockquote:border-purple-500 prose-blockquote:bg-gray-50 prose-blockquote:py-4 prose-blockquote:px-6 prose-blockquote:italic
-                    prose-a:text-red-600 prose-a:no-underline hover:prose-a:underline
-                    [&_.checklist-item]:flex [&_.checklist-item]:items-start [&_.checklist-item]:gap-3 [&_.checklist-item]:py-2
-                    [&_.checklist-item_input]:mt-1 [&_.checklist-item_input]:w-5 [&_.checklist-item_input]:h-5 [&_.checklist-item_input]:accent-red-600
-                    [&_.checklist-item_label]:font-medium [&_.checklist-item_label]:text-gray-900
-                    [&_.item-note]:text-gray-500 [&_.item-note]:text-sm"
-                  dangerouslySetInnerHTML={{ __html: editedContent || preview.content }}
-                />
-                
-                {preview.tags && preview.tags.length > 0 && (
-                  <div className="mt-8 pt-6 border-t border-gray-100 flex flex-wrap gap-2">
-                    {preview.tags.map(tag => (
-                      <span key={tag} className="px-3 py-1 bg-red-50 text-red-600 rounded-full text-sm font-medium">
-                        {tag}
-                      </span>
-                    ))}
-                  </div>
-                )}
-              </div>
-            )}
+          {/* Tags */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">Tags (comma-separated)</label>
+            <input
+              type="text"
+              value={formData.tags}
+              onChange={(e) => setFormData({ ...formData, tags: e.target.value })}
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 text-gray-900"
+              placeholder="techno, chicago, house"
+            />
           </div>
 
-          {/* Publish Bar */}
-          <div className="bg-gray-50 px-6 py-4 border-t border-gray-200 flex items-center justify-between">
-            <div className="text-sm text-gray-500">
-              Slug: <code className="bg-gray-200 px-2 py-0.5 rounded">{preview.slug}</code>
+          {/* SEO */}
+          <div className="border-t border-gray-200 pt-6">
+            <h3 className="font-medium text-gray-900 mb-4">SEO (optional)</h3>
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Meta Title</label>
+                <input
+                  type="text"
+                  value={formData.meta_title}
+                  onChange={(e) => setFormData({ ...formData, meta_title: e.target.value })}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 text-gray-900"
+                  placeholder="Leave blank to use post title"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Meta Description</label>
+                <textarea
+                  value={formData.meta_description}
+                  onChange={(e) => setFormData({ ...formData, meta_description: e.target.value })}
+                  rows={2}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 text-gray-900"
+                  placeholder="Leave blank to use excerpt"
+                />
+              </div>
             </div>
-            <Button
-              onClick={publishPost}
-              disabled={publishing}
-              className="bg-green-600 hover:bg-green-700 text-white"
+          </div>
+
+          {/* Actions */}
+          <div className="flex justify-end gap-3 pt-4 border-t border-gray-200">
+            <Button variant="outline" onClick={cancelEditing}>
+              Cancel
+            </Button>
+            <Button 
+              onClick={handleSave} 
+              disabled={saving}
+              className="bg-red-600 hover:bg-red-700 text-white"
             >
-              {publishing ? (
+              {saving ? (
                 <>
                   <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                  Publishing...
+                  Saving...
                 </>
               ) : (
                 <>
-                  <Send className="w-4 h-4 mr-2" />
-                  Publish to Blog
+                  <Save className="w-4 h-4 mr-2" />
+                  {editingPost ? 'Update Post' : 'Publish Post'}
                 </>
               )}
             </Button>
           </div>
         </div>
+      </div>
+    )
+  }
+
+  // List View
+  return (
+    <div className="max-w-5xl mx-auto py-8 px-4">
+      <div className="flex items-center justify-between mb-6">
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900">Blog Posts</h1>
+          <p className="text-gray-600">Manage your blog content</p>
+        </div>
+        <Button onClick={startCreating} className="bg-red-600 hover:bg-red-700 text-white">
+          <Plus className="w-4 h-4 mr-2" />
+          New Post
+        </Button>
+      </div>
+
+      {/* Success/Error Messages */}
+      {success && (
+        <div className="bg-green-50 border border-green-200 rounded-lg p-4 mb-6">
+          <p className="text-green-700">{success}</p>
+        </div>
+      )}
+      {error && (
+        <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-6">
+          <p className="text-red-700">{error}</p>
+        </div>
       )}
 
-      {/* Status Card */}
-      <div className="bg-white border border-gray-200 rounded-xl p-6 mb-6">
-        <div className="flex items-center justify-between mb-4">
-          <h2 className="font-semibold text-gray-900">Today&apos;s Generation Status</h2>
-          <Button variant="outline" size="sm" onClick={checkStatus}>
-            <RefreshCw className="w-4 h-4 mr-2" />
-            Refresh
-          </Button>
+      {/* Search */}
+      <div className="mb-6">
+        <div className="relative">
+          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
+          <input
+            type="text"
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-red-500 text-gray-900"
+            placeholder="Search posts..."
+          />
         </div>
-        
-        {status ? (
-          <div className="grid grid-cols-3 gap-4">
-            <div className="bg-gray-50 rounded-lg p-4 text-center">
-              <p className="text-2xl font-bold text-red-600">{status.posts_generated}</p>
-              <p className="text-sm text-gray-600">Posts Generated</p>
-            </div>
-            <div className="bg-gray-50 rounded-lg p-4 text-center">
-              <p className="text-2xl font-bold text-cyan-600">{status.remaining}</p>
-              <p className="text-sm text-gray-600">Auto Posts Left</p>
-            </div>
-            <div className="bg-gray-50 rounded-lg p-4 text-center">
-              <p className="text-2xl font-bold text-gray-900">{status.topics_used.length}</p>
-              <p className="text-sm text-gray-600">Topics Used</p>
-            </div>
-          </div>
-        ) : (
-          <p className="text-gray-500 text-center py-4">Click refresh to load status</p>
-        )}
       </div>
 
-      {/* Auto-Generate from @TheFestiveOwl */}
-      <div className="bg-gradient-to-r from-zinc-900 to-zinc-800 border border-zinc-700 rounded-xl p-6">
-        <div className="text-center">
-          <h2 className="font-semibold text-white mb-2">@TheFestiveOwl Pipeline</h2>
-          <p className="text-zinc-400 text-sm mb-4">
-            Pull the last 3 tweets from @TheFestiveOwl and generate blog posts from each
-          </p>
-          <Button 
-            onClick={async () => {
-              setGenerating(true)
-              setError(null)
-              setSuccess(null)
-              try {
-                const res = await fetch('/api/cron/generate-blogs?test=true&limit=3', { method: 'POST' })
-                const data = await res.json()
-                if (data.error) {
-                  setError(data.error + (data.details ? `: ${data.details}` : ''))
-                } else if (data.success) {
-                  const count = data.posts_created || 1
-                  setSuccess(`Generated ${count} post${count > 1 ? 's' : ''} from @TheFestiveOwl`)
-                  await checkStatus()
-                } else if (data.message) {
-                  setSuccess(data.message)
-                }
-              } catch (err) {
-                setError(err instanceof Error ? err.message : 'Unknown error')
-              } finally {
-                setGenerating(false)
-              }
-            }}
-            disabled={generating}
-            className="bg-red-600 hover:bg-red-700 text-white"
-          >
-            {generating ? (
-              <>
-                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                Fetching tweets & generating...
-              </>
-            ) : (
-              <>
-                <Sparkles className="w-4 h-4 mr-2" />
-                Test: Generate from Last 3 Tweets
-              </>
-            )}
-          </Button>
-          <p className="text-zinc-500 text-xs mt-3">
-            Source: nitter.poast.org/TheFestiveOwl/rss
-          </p>
+      {/* Posts List */}
+      {loading ? (
+        <div className="flex items-center justify-center py-12">
+          <Loader2 className="w-8 h-8 animate-spin text-gray-400" />
         </div>
-      </div>
+      ) : filteredPosts.length === 0 ? (
+        <div className="text-center py-12 bg-gray-50 rounded-xl">
+          <p className="text-gray-500 mb-4">No posts found</p>
+          <Button onClick={startCreating} variant="outline">
+            Create your first post
+          </Button>
+        </div>
+      ) : (
+        <div className="space-y-4">
+          {filteredPosts.map(post => (
+            <div 
+              key={post.id} 
+              className="bg-white border border-gray-200 rounded-xl p-4 flex items-center gap-4 hover:border-gray-300 transition-colors"
+            >
+              {/* Thumbnail */}
+              {post.image_url && (
+                <div className="relative w-20 h-20 rounded-lg overflow-hidden flex-shrink-0 bg-gray-100">
+                  <Image
+                    src={post.image_url}
+                    alt={post.title}
+                    fill
+                    className="object-cover"
+                    unoptimized
+                  />
+                </div>
+              )}
+              
+              {/* Content */}
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2 mb-1">
+                  <span className="text-xs font-medium text-red-600 uppercase bg-red-50 px-2 py-0.5 rounded">
+                    {post.category}
+                  </span>
+                  <span className={`text-xs px-2 py-0.5 rounded ${post.status === 'published' ? 'bg-green-50 text-green-700' : 'bg-gray-100 text-gray-600'}`}>
+                    {post.status}
+                  </span>
+                </div>
+                <h3 className="font-semibold text-gray-900 truncate">{post.title}</h3>
+                <p className="text-sm text-gray-500 truncate">{post.excerpt}</p>
+                <p className="text-xs text-gray-400 mt-1">
+                  {new Date(post.created_at).toLocaleDateString('en-US', { 
+                    month: 'short', 
+                    day: 'numeric', 
+                    year: 'numeric' 
+                  })}
+                </p>
+              </div>
+              
+              {/* Actions */}
+              <div className="flex items-center gap-2 flex-shrink-0">
+                <a
+                  href={`/blog/${post.slug}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
+                  title="View"
+                >
+                  <Eye className="w-5 h-5" />
+                </a>
+                <button
+                  onClick={() => startEditing(post)}
+                  className="p-2 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                  title="Edit"
+                >
+                  <Edit3 className="w-5 h-5" />
+                </button>
+                <button
+                  onClick={() => handleDelete(post)}
+                  disabled={deleting === post.id}
+                  className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors disabled:opacity-50"
+                  title="Delete"
+                >
+                  {deleting === post.id ? (
+                    <Loader2 className="w-5 h-5 animate-spin" />
+                  ) : (
+                    <Trash2 className="w-5 h-5" />
+                  )}
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   )
 }
