@@ -2,7 +2,7 @@ import { Metadata } from 'next'
 import { notFound } from 'next/navigation'
 import Link from 'next/link'
 import Image from 'next/image'
-import { ArrowLeft, Calendar, Tag, MapPin, User, Share2 } from 'lucide-react'
+import { ArrowLeft, Calendar, Tag, MapPin, User } from 'lucide-react'
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!
 const SUPABASE_ANON_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
@@ -69,6 +69,8 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
     return { title: 'Post Not Found | Windy City Raves' }
   }
 
+  const imageUrl = post.image_url || post.featured_image
+
   return {
     title: post.meta_title || `${post.title} | Chicago EDM Blog | Windy City Raves`,
     description: post.meta_description || post.excerpt,
@@ -78,13 +80,13 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
       description: post.excerpt,
       type: 'article',
       publishedTime: post.published_at,
-      images: post.featured_image ? [post.featured_image] : [],
+      images: imageUrl ? [imageUrl] : [],
     },
     twitter: {
       card: 'summary_large_image',
       title: post.title,
       description: post.excerpt,
-      images: post.featured_image ? [post.featured_image] : [],
+      images: imageUrl ? [imageUrl] : [],
     },
   }
 }
@@ -100,13 +102,23 @@ const categoryLabels: Record<string, string> = {
 }
 
 const categoryColors: Record<string, string> = {
-  'event-preview': 'bg-cyan-100 text-cyan-700',
-  'event-recap': 'bg-purple-100 text-purple-700',
-  'artist-spotlight': 'bg-red-100 text-red-700',
-  'venue-guide': 'bg-amber-100 text-amber-700',
-  'scene-news': 'bg-emerald-100 text-emerald-700',
-  'industry-news': 'bg-blue-100 text-blue-700',
-  'festival-news': 'bg-pink-100 text-pink-700',
+  'event-preview': 'bg-cyan-500 text-white',
+  'event-recap': 'bg-purple-500 text-white',
+  'artist-spotlight': 'bg-red-500 text-white',
+  'venue-guide': 'bg-amber-500 text-white',
+  'scene-news': 'bg-emerald-500 text-white',
+  'industry-news': 'bg-blue-500 text-white',
+  'festival-news': 'bg-pink-500 text-white',
+}
+
+// Process content to add drop cap to first paragraph
+function processContent(content: string): string {
+  // Find the first <p> tag and add drop cap styling
+  const dropCapContent = content.replace(
+    /<p>([A-Za-z])/,
+    '<p><span class="drop-cap">$1</span>'
+  )
+  return dropCapContent
 }
 
 export default async function BlogPostPage({ params }: { params: Promise<{ slug: string }> }) {
@@ -118,6 +130,8 @@ export default async function BlogPostPage({ params }: { params: Promise<{ slug:
   }
 
   const relatedPosts = await getRelatedPosts(post.category, slug)
+  const imageUrl = post.image_url || post.featured_image
+  const processedContent = processContent(post.content)
 
   // JSON-LD structured data for SEO
   const jsonLd = {
@@ -125,7 +139,7 @@ export default async function BlogPostPage({ params }: { params: Promise<{ slug:
     '@type': 'BlogPosting',
     headline: post.title,
     description: post.excerpt,
-    image: post.featured_image,
+    image: imageUrl,
     datePublished: post.published_at,
     dateModified: post.published_at,
     author: {
@@ -155,100 +169,191 @@ export default async function BlogPostPage({ params }: { params: Promise<{ slug:
         dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
       />
       
+      {/* Drop cap and article styles */}
+      <style dangerouslySetInnerHTML={{ __html: `
+        .drop-cap {
+          float: left;
+          font-family: var(--font-playfair), Georgia, serif;
+          font-size: 4.5rem;
+          line-height: 0.8;
+          font-weight: 700;
+          color: #dc2626;
+          padding-right: 0.75rem;
+          padding-top: 0.25rem;
+        }
+        
+        .article-body p {
+          margin-bottom: 1.5rem;
+          line-height: 1.8;
+        }
+        
+        .article-body h2 {
+          font-family: var(--font-playfair), Georgia, serif;
+          font-size: 1.75rem;
+          font-weight: 700;
+          color: #111827;
+          margin-top: 2.5rem;
+          margin-bottom: 1rem;
+        }
+        
+        .article-body h3 {
+          font-size: 1.25rem;
+          font-weight: 600;
+          color: #1f2937;
+          margin-top: 2rem;
+          margin-bottom: 0.75rem;
+        }
+        
+        .article-body strong, .article-body b {
+          font-weight: 600;
+          color: #111827;
+        }
+        
+        .article-body em, .article-body i {
+          font-style: italic;
+          color: #4b5563;
+        }
+        
+        .article-body a {
+          color: #dc2626;
+          text-decoration: none;
+          border-bottom: 1px solid transparent;
+          transition: border-color 0.2s;
+        }
+        
+        .article-body a:hover {
+          border-bottom-color: #dc2626;
+        }
+        
+        .article-body blockquote {
+          border-left: 4px solid #8b5cf6;
+          background: #f9fafb;
+          padding: 1.5rem 2rem;
+          margin: 2rem 0;
+          font-size: 1.25rem;
+          font-style: italic;
+          color: #4b5563;
+          border-radius: 0 0.5rem 0.5rem 0;
+        }
+        
+        .article-body blockquote p {
+          margin-bottom: 0;
+        }
+        
+        .article-body ul, .article-body ol {
+          margin-bottom: 1.5rem;
+          padding-left: 1.5rem;
+        }
+        
+        .article-body li {
+          margin-bottom: 0.5rem;
+        }
+        
+        .article-body .embed-container {
+          margin: 2rem 0;
+          border-radius: 0.75rem;
+          overflow: hidden;
+        }
+        
+        .article-body iframe {
+          width: 100%;
+          border-radius: 0.75rem;
+        }
+      `}} />
+      
       <main className="min-h-screen bg-white">
-        {/* Hero */}
         <article>
-          <header className="relative">
-            {(post.image_url || post.featured_image) ? (
-              <div className="relative h-[40vh] md:h-[50vh]">
+          {/* Reading flow: Category -> Headline -> Subtitle -> Byline -> Hero Image -> Body */}
+          
+          {/* Header Section */}
+          <header className="pt-8 pb-6">
+            <div className="max-w-2xl mx-auto px-4">
+              {/* Back link */}
+              <Link 
+                href="/blog" 
+                className="inline-flex items-center gap-2 text-gray-500 hover:text-red-500 mb-8 transition-colors text-sm"
+              >
+                <ArrowLeft className="w-4 h-4" />
+                Back to Blog
+              </Link>
+              
+              {/* 1. Category Tag */}
+              <div className="mb-4">
+                <span className={`inline-block px-3 py-1 rounded-full text-xs font-semibold uppercase tracking-wide ${categoryColors[post.category]}`}>
+                  {categoryLabels[post.category]}
+                </span>
+              </div>
+              
+              {/* 2. Headline - Display font */}
+              <h1 className="font-serif text-4xl sm:text-5xl lg:text-6xl font-bold text-gray-900 leading-tight mb-6">
+                {post.title}
+              </h1>
+              
+              {/* 3. Subtitle/Excerpt */}
+              <p className="text-xl text-gray-600 leading-relaxed mb-6">
+                {post.excerpt}
+              </p>
+              
+              {/* 4. Byline */}
+              <div className="flex flex-wrap items-center gap-4 text-sm text-gray-500 pb-6 border-b border-gray-100">
+                <span className="font-medium text-gray-900">Windy City Raves</span>
+                <span className="text-gray-300">|</span>
+                <time className="flex items-center gap-1.5">
+                  <Calendar className="w-4 h-4" />
+                  {new Date(post.published_at).toLocaleDateString('en-US', {
+                    month: 'long',
+                    day: 'numeric',
+                    year: 'numeric'
+                  })}
+                </time>
+                {post.related_artist && (
+                  <>
+                    <span className="text-gray-300">|</span>
+                    <span className="flex items-center gap-1.5">
+                      <User className="w-4 h-4 text-red-500" />
+                      {post.related_artist}
+                    </span>
+                  </>
+                )}
+                {post.related_venue && (
+                  <>
+                    <span className="text-gray-300">|</span>
+                    <span className="flex items-center gap-1.5">
+                      <MapPin className="w-4 h-4 text-cyan-500" />
+                      {post.related_venue}
+                    </span>
+                  </>
+                )}
+              </div>
+            </div>
+          </header>
+
+          {/* 5. Hero Image - Full width */}
+          {imageUrl && (
+            <div className="relative w-full max-w-4xl mx-auto px-4 mb-12">
+              <div className="relative aspect-[16/9] rounded-xl overflow-hidden">
                 <Image
-                  src={post.image_url || post.featured_image || ''}
+                  src={imageUrl}
                   alt={post.title}
                   fill
                   className="object-cover"
                   priority
                   unoptimized
                 />
-                <div className="absolute inset-0 bg-gradient-to-t from-black/70 to-transparent" />
-                {post.image_credit && (
-                  <div className="absolute bottom-4 right-4 text-white/70 text-xs">
-                    Photo: {post.image_credit}
-                  </div>
-                )}
               </div>
-            ) : (
-              <div className="h-[30vh] bg-gradient-to-br from-red-500 to-cyan-500" />
-            )}
-            
-            <div className="max-w-4xl mx-auto px-4 -mt-32 relative z-10">
-              <div className="bg-white rounded-2xl shadow-xl p-8 md:p-12">
-                <Link 
-                  href="/blog" 
-                  className="inline-flex items-center gap-2 text-gray-500 hover:text-red-500 mb-6 transition-colors"
-                >
-                  <ArrowLeft className="w-4 h-4" />
-                  Back to Blog
-                </Link>
-                
-                <div className="flex items-center gap-3 mb-4">
-                  <span className={`px-3 py-1 rounded-full text-sm font-medium ${categoryColors[post.category]}`}>
-                    {categoryLabels[post.category]}
-                  </span>
-                  <span className="text-gray-400">|</span>
-                  <time className="text-gray-500 text-sm flex items-center gap-1">
-                    <Calendar className="w-4 h-4" />
-                    {new Date(post.published_at).toLocaleDateString('en-US', {
-                      month: 'long',
-                      day: 'numeric',
-                      year: 'numeric'
-                    })}
-                  </time>
-                </div>
-                
-                <h1 className="text-3xl md:text-4xl lg:text-5xl font-black text-gray-900 mb-6 leading-tight">
-                  {post.title}
-                </h1>
-                
-                <p className="text-xl text-gray-600 leading-relaxed">
-                  {post.excerpt}
+              {post.image_credit && (
+                <p className="text-xs text-gray-400 mt-2 text-right">
+                  Photo: {post.image_credit}
                 </p>
-                
-                {(post.related_artist || post.related_venue) && (
-                  <div className="flex flex-wrap gap-4 mt-6 pt-6 border-t border-gray-100">
-                    {post.related_artist && (
-                      <span className="flex items-center gap-2 text-sm text-gray-600">
-                        <User className="w-4 h-4 text-red-500" />
-                        {post.related_artist}
-                      </span>
-                    )}
-                    {post.related_venue && (
-                      <span className="flex items-center gap-2 text-sm text-gray-600">
-                        <MapPin className="w-4 h-4 text-cyan-500" />
-                        {post.related_venue}
-                      </span>
-                    )}
-                  </div>
-                )}
-              </div>
+              )}
             </div>
-          </header>
+          )}
 
-          {/* Content */}
-          <div className="max-w-4xl mx-auto px-4 py-12">
+          {/* 6. Body Content - Constrained width for readability */}
+          <div className="max-w-2xl mx-auto px-4 pb-16">
             <div 
-              className="prose prose-lg prose-gray max-w-none 
-                prose-headings:font-bold prose-headings:text-gray-900
-                prose-h2:text-2xl prose-h2:mt-10 prose-h2:mb-4
-                prose-p:mb-6 prose-p:leading-relaxed
-                prose-strong:text-gray-900 prose-strong:font-semibold
-                prose-em:text-gray-700
-                prose-blockquote:border-l-4 prose-blockquote:border-red-500 prose-blockquote:bg-gray-50 prose-blockquote:py-4 prose-blockquote:px-6 prose-blockquote:italic prose-blockquote:text-gray-700 prose-blockquote:not-italic prose-blockquote:font-medium
-                prose-a:text-red-500 prose-a:no-underline hover:prose-a:underline
-                [&_.embed-container]:my-8 [&_.embed-container]:rounded-xl [&_.embed-container]:overflow-hidden
-                [&_.twitter-embed]:bg-gray-50 [&_.twitter-embed]:p-4
-                [&_.spotify-embed]:bg-gray-900 [&_.spotify-embed]:p-4
-                [&_.soundcloud-embed]:bg-orange-50 [&_.soundcloud-embed]:p-4"
-              dangerouslySetInnerHTML={{ __html: post.content }}
+              className="article-body text-lg text-gray-800 leading-relaxed"
+              dangerouslySetInnerHTML={{ __html: processedContent }}
             />
             
             {/* Tags */}
@@ -289,28 +394,35 @@ export default async function BlogPostPage({ params }: { params: Promise<{ slug:
         {/* Related Posts */}
         {relatedPosts.length > 0 && (
           <section className="bg-gray-50 py-16 px-4">
-            <div className="max-w-6xl mx-auto">
-              <h2 className="text-2xl font-bold text-gray-900 mb-8">Related Posts</h2>
+            <div className="max-w-4xl mx-auto">
+              <h2 className="font-serif text-2xl font-bold text-gray-900 mb-8">More from the Scene</h2>
               <div className="grid md:grid-cols-3 gap-8">
-                {relatedPosts.map((relatedPost) => (
-                  <Link key={relatedPost.id} href={`/blog/${relatedPost.slug}`} className="group">
-                    <div className="relative aspect-[16/10] rounded-xl overflow-hidden bg-gray-200 mb-4">
-                      {relatedPost.featured_image ? (
-                        <Image
-                          src={relatedPost.featured_image}
-                          alt={relatedPost.title}
-                          fill
-                          className="object-cover group-hover:scale-105 transition-transform duration-300"
-                        />
-                      ) : (
-                        <div className="absolute inset-0 bg-gradient-to-br from-red-500 to-cyan-500" />
-                      )}
-                    </div>
-                    <h3 className="font-bold text-gray-900 group-hover:text-red-500 transition-colors line-clamp-2">
-                      {relatedPost.title}
-                    </h3>
-                  </Link>
-                ))}
+                {relatedPosts.map((relatedPost) => {
+                  const relatedImage = relatedPost.image_url || relatedPost.featured_image
+                  return (
+                    <Link key={relatedPost.id} href={`/blog/${relatedPost.slug}`} className="group">
+                      <div className="relative aspect-[16/10] rounded-xl overflow-hidden bg-gray-200 mb-4">
+                        {relatedImage ? (
+                          <Image
+                            src={relatedImage}
+                            alt={relatedPost.title}
+                            fill
+                            className="object-cover group-hover:scale-105 transition-transform duration-300"
+                            unoptimized
+                          />
+                        ) : (
+                          <div className="absolute inset-0 bg-gradient-to-br from-red-500 to-cyan-500" />
+                        )}
+                      </div>
+                      <span className={`inline-block px-2 py-0.5 rounded text-xs font-medium mb-2 ${categoryColors[relatedPost.category]}`}>
+                        {categoryLabels[relatedPost.category]}
+                      </span>
+                      <h3 className="font-bold text-gray-900 group-hover:text-red-500 transition-colors line-clamp-2">
+                        {relatedPost.title}
+                      </h3>
+                    </Link>
+                  )
+                })}
               </div>
             </div>
           </section>
@@ -318,8 +430,8 @@ export default async function BlogPostPage({ params }: { params: Promise<{ slug:
 
         {/* CTA Section */}
         <section className="py-16 px-4">
-          <div className="max-w-4xl mx-auto text-center">
-            <h2 className="text-2xl font-bold text-gray-900 mb-4">Find Your Next Event</h2>
+          <div className="max-w-2xl mx-auto text-center">
+            <h2 className="font-serif text-2xl font-bold text-gray-900 mb-4">Find Your Next Event</h2>
             <p className="text-gray-600 mb-8">
               Discover what&apos;s happening tonight and this weekend in Chicago&apos;s EDM scene.
             </p>

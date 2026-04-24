@@ -1,5 +1,5 @@
 import type { Metadata, Viewport } from 'next'
-import { Inter, Space_Grotesk } from 'next/font/google'
+import { Inter, Space_Grotesk, Playfair_Display } from 'next/font/google'
 import { Analytics } from '@vercel/analytics/next'
 import { Navigation } from '@/components/navigation'
 import './globals.css'
@@ -12,6 +12,12 @@ const inter = Inter({
 const spaceGrotesk = Space_Grotesk({ 
   subsets: ["latin"],
   variable: '--font-space'
+});
+
+const playfair = Playfair_Display({
+  subsets: ["latin"],
+  variable: '--font-playfair',
+  weight: ['400', '700', '900']
 });
 
 export const viewport: Viewport = {
@@ -227,7 +233,7 @@ export default function RootLayout({
           dangerouslySetInnerHTML={{ __html: JSON.stringify(localBusinessJsonLd) }}
         />
       </head>
-      <body className={`${inter.variable} ${spaceGrotesk.variable} font-sans antialiased w-full max-w-full bg-background text-foreground`}>
+      <body className={`${inter.variable} ${spaceGrotesk.variable} ${playfair.variable} font-sans antialiased w-full max-w-full bg-background text-foreground`}>
         <Navigation />
         {children}
         <Analytics />
