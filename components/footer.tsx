@@ -6,7 +6,7 @@ import { Instagram, Music } from "lucide-react"
 
 export function Footer() {
   return (
-    <footer className="py-12 border-t border-border overflow-x-clip w-full max-w-full">
+    <footer className="py-12 border-t border-gray-100 bg-white overflow-x-clip w-full max-w-full">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex flex-col md:flex-row items-center justify-between gap-6">
           {/* Logo */}
@@ -24,15 +24,16 @@ export function Footer() {
           {/* Links */}
           <nav className="flex items-center gap-6 text-sm text-muted-foreground">
             <a href="/" className="hover:text-foreground transition-colors">
+              Home
+            </a>
+            <a href="/events" className="hover:text-foreground transition-colors">
               Events
             </a>
-            <a 
-              href="https://windycityraves.com/pages/promote-your-event" 
-              target="_blank"
-              rel="noopener noreferrer"
-              className="hover:text-foreground transition-colors"
-            >
-              Promote Your Event
+            <a href="/promote" className="hover:text-foreground transition-colors">
+              Promote
+            </a>
+            <a href="/apply" className="hover:text-foreground transition-colors">
+              Apply
             </a>
           </nav>
 

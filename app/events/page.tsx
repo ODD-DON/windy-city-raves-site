@@ -244,7 +244,7 @@ export default function Home() {
   }, [filteredEvents])
 
   return (
-    <div className="bg-background pb-8">
+    <div className="bg-white pb-8">
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8">
         {/* Hero section - Clean & Bold */}
         <header className="mb-8 sm:mb-10 text-center">
@@ -257,10 +257,10 @@ export default function Home() {
             >
               {currentLocation.city}
             </span>
-            <span className="text-foreground"> EDM Events</span>
+            <span className="text-gray-900"> EDM Events</span>
           </h1>
           
-          <p className="text-xl sm:text-2xl md:text-3xl font-semibold text-foreground mb-3">
+          <p className="text-xl sm:text-2xl md:text-3xl font-semibold text-gray-900 mb-3">
             {"What's happening tonight & this weekend"}
           </p>
           

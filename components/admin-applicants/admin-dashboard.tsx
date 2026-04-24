@@ -217,7 +217,12 @@ export function AdminDashboard({ applications, stats }: AdminDashboardProps) {
   }
 
   return (
-    <div className="max-w-7xl mx-auto px-4 py-8 flex flex-col gap-8">
+    <div className="max-w-7xl mx-auto px-4 sm:px-6 py-8 flex flex-col gap-8">
+      {/* Page Header */}
+      <div>
+        <h1 className="text-2xl font-bold tracking-tight text-foreground">Talent Applications</h1>
+        <p className="text-muted-foreground mt-1">Review and manage DJ, photographer, and performer applications</p>
+      </div>
 
       {/* Delete confirmation dialog */}
       {confirmDeleteId && (
