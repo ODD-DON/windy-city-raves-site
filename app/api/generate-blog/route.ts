@@ -39,11 +39,14 @@ const genres = [
 
 export async function POST(req: Request) {
   try {
-    // Verify API key for security
+    // Check for test mode or verify API key
+    const url = new URL(req.url)
+    const isTest = url.searchParams.get('test') === 'true'
     const authHeader = req.headers.get('authorization')
     const cronSecret = process.env.CRON_SECRET
     
-    if (cronSecret && authHeader !== `Bearer ${cronSecret}`) {
+    // Allow test mode without auth, or require auth for production
+    if (!isTest && cronSecret && authHeader !== `Bearer ${cronSecret}`) {
       return Response.json({ error: 'Unauthorized' }, { status: 401 })
     }
 

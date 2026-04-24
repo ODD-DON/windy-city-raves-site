@@ -8,6 +8,7 @@ import {
   LogOut,
   Home,
   Star,
+  FileText,
 } from "lucide-react"
 import { supabaseClient } from "@/lib/supabase/client"
 
@@ -23,6 +24,12 @@ const adminNavItems = [
     href: "/admin/applicants",
     icon: Users,
     description: "Review talent applications",
+  },
+  {
+    label: "Blog Generator",
+    href: "/admin/blog",
+    icon: FileText,
+    description: "Generate AI blog posts",
   },
 ]
 
