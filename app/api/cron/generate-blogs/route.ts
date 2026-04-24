@@ -123,7 +123,7 @@ async function generateBlogPost(newsItems: RSSItem[]): Promise<{
   ).join('\n---\n')
 
   const { text } = await generateText({
-    model: anthropic('claude-3-haiku-20240307'),
+    model: anthropic('claude-3-5-haiku-latest'),
     prompt: `You are a music journalist writing for Windy City Raves, Chicago's premier electronic music community platform.
 
 Based on the following REAL, CURRENT EDM news items, write an original, engaging blog post that covers the most interesting story or combines related stories into a compelling narrative.
