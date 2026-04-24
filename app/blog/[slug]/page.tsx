@@ -15,6 +15,9 @@ type BlogPost = {
   content: string
   category: string
   featured_image: string | null
+  image_url: string | null
+  image_credit: string | null
+  tags: string[] | null
   meta_title: string | null
   meta_description: string | null
   keywords: string[] | null
@@ -92,6 +95,8 @@ const categoryLabels: Record<string, string> = {
   'artist-spotlight': 'Artist Spotlight',
   'venue-guide': 'Venue Guide',
   'scene-news': 'Scene News',
+  'industry-news': 'Industry News',
+  'festival-news': 'Festival News',
 }
 
 const categoryColors: Record<string, string> = {
@@ -100,6 +105,8 @@ const categoryColors: Record<string, string> = {
   'artist-spotlight': 'bg-red-100 text-red-700',
   'venue-guide': 'bg-amber-100 text-amber-700',
   'scene-news': 'bg-emerald-100 text-emerald-700',
+  'industry-news': 'bg-blue-100 text-blue-700',
+  'festival-news': 'bg-pink-100 text-pink-700',
 }
 
 export default async function BlogPostPage({ params }: { params: Promise<{ slug: string }> }) {
@@ -152,16 +159,22 @@ export default async function BlogPostPage({ params }: { params: Promise<{ slug:
         {/* Hero */}
         <article>
           <header className="relative">
-            {post.featured_image ? (
+            {(post.image_url || post.featured_image) ? (
               <div className="relative h-[40vh] md:h-[50vh]">
                 <Image
-                  src={post.featured_image}
+                  src={post.image_url || post.featured_image || ''}
                   alt={post.title}
                   fill
                   className="object-cover"
                   priority
+                  unoptimized
                 />
                 <div className="absolute inset-0 bg-gradient-to-t from-black/70 to-transparent" />
+                {post.image_credit && (
+                  <div className="absolute bottom-4 right-4 text-white/70 text-xs">
+                    Photo: {post.image_credit}
+                  </div>
+                )}
               </div>
             ) : (
               <div className="h-[30vh] bg-gradient-to-br from-red-500 to-cyan-500" />
@@ -227,15 +240,31 @@ export default async function BlogPostPage({ params }: { params: Promise<{ slug:
               dangerouslySetInnerHTML={{ __html: post.content }}
             />
             
-            {/* Keywords/Tags */}
-            {post.keywords && post.keywords.length > 0 && (
+            {/* Tags */}
+            {post.tags && post.tags.length > 0 && (
               <div className="mt-12 pt-8 border-t border-gray-100">
                 <div className="flex items-center gap-2 flex-wrap">
                   <Tag className="w-4 h-4 text-gray-400" />
+                  {post.tags.map((tag) => (
+                    <span 
+                      key={tag}
+                      className="px-3 py-1 bg-red-50 text-red-600 rounded-full text-sm font-medium"
+                    >
+                      {tag}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            )}
+            
+            {/* Keywords for SEO */}
+            {post.keywords && post.keywords.length > 0 && (
+              <div className="mt-6">
+                <div className="flex items-center gap-2 flex-wrap">
                   {post.keywords.map((keyword) => (
                     <span 
                       key={keyword}
-                      className="px-3 py-1 bg-gray-100 text-gray-600 rounded-full text-sm"
+                      className="px-3 py-1 bg-gray-100 text-gray-500 rounded-full text-xs"
                     >
                       {keyword}
                     </span>

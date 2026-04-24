@@ -26,11 +26,25 @@ export default function BlogAdminPage() {
   const [lastPost, setLastPost] = useState<BlogPost | null>(null)
   const [error, setError] = useState<string | null>(null)
 
+  const [newsSources, setNewsSources] = useState<string[]>([])
+
   const checkStatus = async () => {
     try {
-      const res = await fetch('/api/generate-blog')
-      const data = await res.json()
-      setStatus(data)
+      // Fetch today's generation log from Supabase
+      const today = new Date().toISOString().split('T')[0]
+      const res = await fetch(`${process.env.NEXT_PUBLIC_SUPABASE_URL}/rest/v1/wcr_blog_generation_log?date=eq.${today}`, {
+        headers: {
+          'apikey': process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '',
+        }
+      })
+      const logs = await res.json()
+      const todayLog = logs[0]
+      setStatus({
+        date: today,
+        posts_generated: todayLog?.posts_generated || 0,
+        topics_used: todayLog?.topics_used || [],
+        remaining: 3 - (todayLog?.posts_generated || 0)
+      })
     } catch (err) {
       console.error('Failed to check status:', err)
     }
@@ -39,9 +53,10 @@ export default function BlogAdminPage() {
   const generatePost = async () => {
     setGenerating(true)
     setError(null)
+    setNewsSources([])
     
     try {
-      const res = await fetch('/api/generate-blog?test=true', {
+      const res = await fetch('/api/cron/generate-blogs?test=true', {
         method: 'POST',
       })
       
@@ -49,8 +64,18 @@ export default function BlogAdminPage() {
       
       if (data.error) {
         setError(data.error + (data.details ? `: ${data.details}` : ''))
-      } else if (data.post) {
-        setLastPost(data.post)
+      } else if (data.success && data.post) {
+        setLastPost({
+          id: '',
+          title: data.post.title,
+          slug: data.post.slug,
+          excerpt: data.post.excerpt || '',
+          category: data.post.category,
+          published_at: new Date().toISOString()
+        })
+        if (data.news_sources_used) {
+          setNewsSources(data.news_sources_used)
+        }
         await checkStatus()
       } else if (data.message) {
         setError(data.message)
@@ -139,10 +164,15 @@ export default function BlogAdminPage() {
         <div className="bg-white border border-gray-200 rounded-xl p-6">
           <h2 className="font-semibold text-gray-900 mb-4">Last Generated Post</h2>
           <div className="space-y-3">
-            <div>
+            <div className="flex flex-wrap gap-2">
               <span className="text-xs font-medium text-red-600 uppercase bg-red-50 px-2 py-1 rounded">
                 {lastPost.category}
               </span>
+              {newsSources.length > 0 && newsSources.map(source => (
+                <span key={source} className="text-xs font-medium text-cyan-600 bg-cyan-50 px-2 py-1 rounded">
+                  {source}
+                </span>
+              ))}
             </div>
             <h3 className="text-xl font-bold text-gray-900">{lastPost.title}</h3>
             <p className="text-gray-600">{lastPost.excerpt}</p>
