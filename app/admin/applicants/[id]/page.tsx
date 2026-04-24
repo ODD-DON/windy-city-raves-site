@@ -1,7 +1,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { notFound } from 'next/navigation'
 import type { ApplicationWithProfiles } from '@/lib/types'
-import { ApplicantDetail } from '@/components/admin/applicant-detail'
+import { ApplicantDetail } from '@/components/admin-applicants/applicant-detail'
 
 interface PageProps {
   params: Promise<{ id: string }>

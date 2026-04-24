@@ -7,10 +7,8 @@ import { supabaseClient } from "@/lib/supabase/client"
 import { Input } from "@/components/ui/input"
 import { Spinner } from "@/components/ui/spinner"
 import { 
-  ArrowLeft, 
   Star, 
   Search, 
-  LogOut, 
   ChevronUp, 
   ChevronDown,
   Calendar,
@@ -200,16 +198,7 @@ export default function AdminPage() {
     fetchData()
   }, [fetchData])
 
-  const handleLogout = async () => {
-    await supabaseClient.auth.signOut()
-    // Also clear sessionStorage fallback
-    try {
-      sessionStorage.removeItem("wcr_admin_token")
-      sessionStorage.removeItem("wcr_admin_user")
-    } catch {}
-    router.push("/")
-    router.refresh()
-  }
+
 
   const toggleFeatured = async (eventId: number) => {
     setUpdating(eventId)
@@ -567,40 +556,15 @@ export default function AdminPage() {
   }
 
   return (
-    <div className="bg-background pb-8">
-      {/* Top Navigation Bar */}
-      <div className="sticky top-0 z-50 border-b border-border/50 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-        <div className="max-w-5xl mx-auto px-4 sm:px-6">
-          <div className="flex items-center justify-between h-14">
-            <div className="flex items-center gap-4">
-              <button 
-                onClick={() => router.push("/")}
-                className="flex items-center gap-2 text-muted-foreground hover:text-foreground transition-colors"
-              >
-                <ArrowLeft className="w-4 h-4" />
-                <span className="text-sm font-medium">Back</span>
-              </button>
-              <div className="h-4 w-px bg-border" />
-              <h1 className="text-sm font-semibold">Admin Panel</h1>
-            </div>
-            <div className="flex items-center gap-4">
-              <LocationSelector 
-                currentLocation={currentLocation}
-                onLocationChange={setCurrentLocation}
-              />
-              <button 
-                onClick={handleLogout}
-                className="flex items-center gap-2 text-muted-foreground hover:text-foreground transition-colors text-sm"
-              >
-                <LogOut className="w-4 h-4" />
-                <span className="hidden sm:inline">Sign Out</span>
-              </button>
-            </div>
-          </div>
-        </div>
-      </div>
-
+    <div className="pb-8">
       <div className="max-w-5xl mx-auto px-4 sm:px-6 py-8">
+        {/* Location Selector */}
+        <div className="flex items-center justify-end mb-6">
+          <LocationSelector 
+            currentLocation={currentLocation}
+            onLocationChange={setCurrentLocation}
+          />
+        </div>
         {/* Page Title & Stats */}
         <div className="mb-8">
           <div className="flex items-center gap-2 text-sm text-muted-foreground mb-2">

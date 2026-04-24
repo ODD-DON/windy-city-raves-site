@@ -1,33 +1,46 @@
 import { createClient } from '@/lib/supabase/server'
-import { notFound } from 'next/navigation'
-import type { ApplicationWithProfiles } from '@/lib/types'
-import { ApplicantDetail } from '@/components/admin/applicant-detail'
+import { AdminDashboard } from '@/components/admin-applicants/admin-dashboard'
+import type { Application, ApplicationStatus, ApplicantType } from '@/lib/types'
 
-interface PageProps {
-  params: Promise<{ id: string }>
-}
+export const dynamic = 'force-dynamic'
 
-export default async function ApplicantDetailPage({ params }: PageProps) {
-  const { id } = await params
+export default async function ApplicantsPage() {
   const supabase = await createClient()
 
-  const { data: application, error } = await supabase
+  // Fetch all applications
+  const { data: applications, error } = await supabase
     .from('wcr_jobs_applications')
-    .select(
-      `
-      *,
-      wcr_jobs_dj_profiles(*),
-      wcr_jobs_photo_profiles(*),
-      wcr_jobs_performer_profiles(*),
-      wcr_jobs_notes(*)
-    `,
-    )
-    .eq('id', id)
-    .single()
+    .select('*')
+    .order('created_at', { ascending: false })
 
-  if (error || !application) {
-    notFound()
+  if (error) {
+    console.error('Error fetching applications:', error)
+    return (
+      <div className="max-w-7xl mx-auto px-4 py-8">
+        <div className="bg-red-500/10 border border-red-500/20 rounded-xl p-6 text-center">
+          <p className="text-red-400">Failed to load applications. Please try again.</p>
+        </div>
+      </div>
+    )
   }
 
-  return <ApplicantDetail application={application as ApplicationWithProfiles} />
+  const apps = (applications ?? []) as Application[]
+
+  // Calculate stats
+  const stats = {
+    total: apps.length,
+    new: apps.filter(a => a.status === 'new').length,
+    reviewed: apps.filter(a => a.status === 'reviewed').length,
+    shortlisted: apps.filter(a => a.status === 'shortlisted').length,
+    approved: apps.filter(a => a.status === 'approved').length,
+    rejected: apps.filter(a => a.status === 'rejected').length,
+    archived: apps.filter(a => a.status === 'archived').length,
+    by_type: {
+      dj: apps.filter(a => a.applicant_type === 'dj').length,
+      photo_video: apps.filter(a => a.applicant_type === 'photo_video').length,
+      performer: apps.filter(a => a.applicant_type === 'performer').length,
+    }
+  }
+
+  return <AdminDashboard applications={apps} stats={stats} />
 }
