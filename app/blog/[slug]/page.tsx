@@ -177,17 +177,6 @@ export default async function BlogPostPage({ params }: { params: Promise<{ slug:
           color: #e5e5e5;
         }
         
-        .wcr-body p:first-of-type::first-letter {
-          float: left;
-          font-size: 4rem;
-          line-height: 0.8;
-          font-weight: 800;
-          color: #ef4444;
-          padding-right: 0.75rem;
-          padding-top: 0.35rem;
-          font-family: system-ui, -apple-system, sans-serif;
-        }
-        
         .wcr-body h2 {
           font-size: 1.5rem;
           font-weight: 800;
