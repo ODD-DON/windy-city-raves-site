@@ -8,26 +8,18 @@ const anthropic = new Anthropic({
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!
 const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY!
 
-// RSS feeds from major EDM news sources
-const RSS_FEEDS = [
-  { url: 'https://dancingastronaut.com/feed/', source: 'Dancing Astronaut' },
-  { url: 'https://mixmag.net/feed', source: 'Mixmag' },
-  { url: 'https://www.billboard.com/c/music/music-news/dance/feed/', source: 'Billboard Dance' },
-  { url: 'https://edm.com/feed', source: 'EDM.com' },
-  { url: 'https://djmag.com/feed', source: 'DJ Mag' },
-]
+// The Festive Owl Nitter RSS feed - single source of truth
+const FESTIVE_OWL_RSS = 'https://nitter.poast.org/TheFestiveOwl/rss'
 
-interface RSSItem {
-  title: string
+interface Tweet {
+  id: string
+  text: string
   link: string
-  description: string
   pubDate: string
-  source: string
   imageUrl?: string
-  rawContent?: string
 }
 
-// WCR System Prompt with web search instructions
+// WCR System Prompt
 const WCR_SYSTEM_PROMPT = `You are a writer for Windy City Raves, a Chicago underground EDM blog.
 
 Before writing anything, search the web for current, accurate information about the topic. Run as many searches as you need to get real facts, real names, real dates, and real lineups. Never write from memory alone.
@@ -56,7 +48,7 @@ FORMAT YOUR RESPONSE AS CLEAN HTML:
 
 // Generate Unsplash fallback URL from title keywords
 function getUnsplashFallback(title: string): string {
-  const stopWords = ['the', 'a', 'an', 'and', 'or', 'but', 'in', 'on', 'at', 'to', 'for', 'of', 'with', 'by', 'is', 'are', 'was', 'were', 'new', 'announces', 'releases', 'drops', 'reveals']
+  const stopWords = ['the', 'a', 'an', 'and', 'or', 'but', 'in', 'on', 'at', 'to', 'for', 'of', 'with', 'by', 'is', 'are', 'was', 'were', 'new', 'announces', 'releases', 'drops', 'reveals', 'just', 'has', 'have', 'been', 'will', 'be']
   const keywords = title
     .toLowerCase()
     .replace(/[^a-z0-9\s]/g, '')
@@ -77,74 +69,92 @@ async function isImageValid(url: string): Promise<boolean> {
       signal: AbortSignal.timeout(5000)
     })
     const contentType = response.headers.get('content-type')
-    return response.ok && (contentType?.startsWith('image/') || url.includes('unsplash'))
+    return response.ok && (contentType?.startsWith('image/') || url.includes('unsplash') || url.includes('nitter'))
   } catch {
     return false
   }
 }
 
-// Parse RSS feed and extract items
-async function fetchRSSFeed(feedUrl: string, source: string): Promise<RSSItem[]> {
+// Fetch tweets from The Festive Owl via Nitter RSS
+async function fetchFestiveOwlTweets(): Promise<Tweet[]> {
   try {
-    const response = await fetch(feedUrl, {
+    const response = await fetch(FESTIVE_OWL_RSS, {
       headers: { 'User-Agent': 'WindyCityRaves/1.0' },
-      next: { revalidate: 3600 }
+      next: { revalidate: 1800 } // Cache for 30 mins
     })
     
-    if (!response.ok) return []
+    if (!response.ok) {
+      console.error('Failed to fetch Festive Owl RSS:', response.status)
+      return []
+    }
     
     const xml = await response.text()
-    const items: RSSItem[] = []
+    const tweets: Tweet[] = []
     
+    // Parse RSS items
     const itemMatches = xml.match(/<item>([\s\S]*?)<\/item>/g) || []
     
-    for (const itemXml of itemMatches.slice(0, 5)) {
+    for (const itemXml of itemMatches.slice(0, 10)) {
+      // Extract tweet ID from link
+      const link = itemXml.match(/<link>(.*?)<\/link>/)?.[1] || ''
+      const idMatch = link.match(/status\/(\d+)/)
+      const id = idMatch ? idMatch[1] : ''
+      
+      // Get tweet text from title or description
       const title = itemXml.match(/<title><!\[CDATA\[(.*?)\]\]><\/title>/)?.[1] || 
                     itemXml.match(/<title>(.*?)<\/title>/)?.[1] || ''
-      const link = itemXml.match(/<link>(.*?)<\/link>/)?.[1] || ''
-      const description = itemXml.match(/<description><!\[CDATA\[(.*?)\]\]><\/description>/)?.[1] ||
-                          itemXml.match(/<description>(.*?)<\/description>/)?.[1] || ''
+      const description = itemXml.match(/<description><!\[CDATA\[([\s\S]*?)\]\]><\/description>/)?.[1] ||
+                          itemXml.match(/<description>([\s\S]*?)<\/description>/)?.[1] || ''
+      
       const pubDate = itemXml.match(/<pubDate>(.*?)<\/pubDate>/)?.[1] || ''
-      const contentEncoded = itemXml.match(/<content:encoded><!\[CDATA\[([\s\S]*?)\]\]><\/content:encoded>/)?.[1] || ''
       
-      const imageUrl = itemXml.match(/<media:content[^>]*url="([^"]+)"/)?.[1] ||
-                       itemXml.match(/<enclosure[^>]*url="([^"]+)"/)?.[1] ||
-                       itemXml.match(/<media:thumbnail[^>]*url="([^"]+)"/)?.[1] || undefined
+      // Extract image from enclosure or media tags
+      const imageUrl = itemXml.match(/<enclosure[^>]*url="([^"]+)"/)?.[1] ||
+                       itemXml.match(/<media:content[^>]*url="([^"]+)"/)?.[1] ||
+                       // Also check for images in description HTML
+                       description.match(/src="([^"]+\.(jpg|png|gif|webp))"/i)?.[1] ||
+                       undefined
       
-      if (title && link) {
-        items.push({
-          title: title.replace(/<[^>]*>/g, '').trim(),
-          link,
-          description: description.replace(/<[^>]*>/g, '').substring(0, 500),
-          pubDate,
-          source,
-          imageUrl,
-          rawContent: contentEncoded || description
-        })
+      // Clean text - remove HTML, decode entities
+      const text = (description || title)
+        .replace(/<[^>]*>/g, ' ')
+        .replace(/&amp;/g, '&')
+        .replace(/&lt;/g, '<')
+        .replace(/&gt;/g, '>')
+        .replace(/&quot;/g, '"')
+        .replace(/&#39;/g, "'")
+        .replace(/\s+/g, ' ')
+        .trim()
+      
+      if (id && text.length > 20) {
+        tweets.push({ id, text, link, pubDate, imageUrl })
       }
     }
     
-    return items
+    return tweets
   } catch (error) {
-    console.error(`Failed to fetch RSS from ${source}:`, error)
+    console.error('Failed to fetch Festive Owl tweets:', error)
     return []
   }
 }
 
-// Fetch all RSS feeds
-async function fetchAllNews(): Promise<RSSItem[]> {
-  const allItems: RSSItem[] = []
-  
-  await Promise.all(
-    RSS_FEEDS.map(async (feed) => {
-      const items = await fetchRSSFeed(feed.url, feed.source)
-      allItems.push(...items)
-    })
-  )
-  
-  return allItems
-    .sort((a, b) => new Date(b.pubDate).getTime() - new Date(a.pubDate).getTime())
-    .slice(0, 15)
+// Check if tweet has already been processed
+async function isTweetProcessed(tweetId: string): Promise<boolean> {
+  try {
+    const response = await fetch(
+      `${SUPABASE_URL}/rest/v1/wcr_blog_posts?related_event_id=eq.tweet_${tweetId}&select=id`,
+      {
+        headers: {
+          'apikey': SUPABASE_SERVICE_KEY,
+          'Authorization': `Bearer ${SUPABASE_SERVICE_KEY}`,
+        },
+      }
+    )
+    const posts = await response.json()
+    return Array.isArray(posts) && posts.length > 0
+  } catch {
+    return false
+  }
 }
 
 // Generate a unique slug
@@ -159,8 +169,8 @@ function generateSlug(title: string): string {
   return `${baseSlug}-${timestamp}`
 }
 
-// Generate blog post using Claude with web search
-async function generateBlogPost(newsItems: RSSItem[]): Promise<{
+// Generate blog post from tweet using Claude with web search
+async function generateBlogPostFromTweet(tweet: Tweet): Promise<{
   title: string
   excerpt: string
   content: string
@@ -170,10 +180,6 @@ async function generateBlogPost(newsItems: RSSItem[]): Promise<{
   category: string
   tags: string[]
 }> {
-  const newsContext = newsItems.slice(0, 5).map(item => 
-    `- ${item.title} (${item.source}): ${item.description.substring(0, 200)}...`
-  ).join('\n')
-
   const response = await anthropic.messages.create({
     model: 'claude-haiku-4-5-20251001',
     max_tokens: 4000,
@@ -187,18 +193,20 @@ async function generateBlogPost(newsItems: RSSItem[]): Promise<{
     messages: [
       {
         role: 'user',
-        content: `Here are today's top EDM news headlines:
+        content: `Here's a tweet from @TheFestiveOwl (a trusted EDM news account):
 
-${newsContext}
+"${tweet.text}"
 
-Pick the most interesting story and write an original blog post about it. Search the web first to get more details, full context, and any related info.
+Tweet link: ${tweet.link}
 
-After searching, write the post and respond with ONLY valid JSON (no markdown):
+This is real breaking news in the EDM world. Search the web to get more details, context, artist info, venue info, dates, and any related stories. Then write an original blog post about it.
+
+After searching, respond with ONLY valid JSON (no markdown):
 {
   "title": "Catchy headline, 50-70 chars, no clickbait",
   "excerpt": "Hook for social sharing, 150-200 chars",
-  "content": "Full HTML article with <p> tags for each paragraph, <strong> for emphasis, <em> for track titles, <blockquote> for standout quotes. 5-8 short paragraphs.",
-  "metaTitle": "SEO title with artist + Chicago EDM, 50-60 chars",
+  "content": "Full HTML article with <p> tags for each paragraph, <strong> for emphasis, <em> for track titles. 5-8 short paragraphs.",
+  "metaTitle": "SEO title with artist + EDM news, 50-60 chars",
   "metaDescription": "SEO description, 150-160 chars",
   "keywords": ["array", "of", "8-10", "seo", "keywords"],
   "category": "scene-news or artist-spotlight or festival-news or industry-news",
@@ -210,22 +218,11 @@ Remember: WCR voice. Short paragraphs. No em dashes. No AI filler. Opinionated.`
     ]
   })
 
-  // Extract text from response (handling potential tool use)
+  // Extract text from response
   let textContent = ''
   for (const block of response.content) {
     if (block.type === 'text') {
       textContent = block.text
-      break
-    }
-  }
-
-  // If no direct text, there might be tool results - get the final text
-  if (!textContent) {
-    // Claude may have done web searches, find the final text response
-    for (const block of response.content) {
-      if (block.type === 'text') {
-        textContent = block.text
-      }
     }
   }
 
@@ -262,6 +259,7 @@ async function saveBlogPost(post: {
   tags: string[]
   imageUrl: string
   imageCredit: string
+  tweetId: string
 }) {
   const response = await fetch(`${SUPABASE_URL}/rest/v1/wcr_blog_posts`, {
     method: 'POST',
@@ -283,6 +281,7 @@ async function saveBlogPost(post: {
       tags: post.tags,
       image_url: post.imageUrl,
       image_credit: post.imageCredit,
+      related_event_id: `tweet_${post.tweetId}`, // Store tweet ID to prevent duplicates
       status: 'published',
       published_at: new Date().toISOString(),
       ai_generated: true
@@ -307,6 +306,7 @@ export async function GET(req: NextRequest) {
   }
 
   try {
+    // Check daily limit
     const today = new Date().toISOString().split('T')[0]
     const logRes = await fetch(
       `${SUPABASE_URL}/rest/v1/wcr_blog_generation_log?date=eq.${today}`,
@@ -328,34 +328,57 @@ export async function GET(req: NextRequest) {
       })
     }
 
-    const newsItems = await fetchAllNews()
+    // Fetch latest tweets from The Festive Owl
+    const tweets = await fetchFestiveOwlTweets()
     
-    if (newsItems.length === 0) {
+    if (tweets.length === 0) {
       return Response.json({ 
         success: false, 
-        message: 'No news items found from RSS feeds' 
+        message: 'No tweets found from @TheFestiveOwl' 
       })
     }
 
-    const blogPost = await generateBlogPost(newsItems)
-    const slug = generateSlug(blogPost.title)
-
-    // Get image - try RSS images first, fallback to Unsplash
-    let imageUrl = getUnsplashFallback(blogPost.title)
-    let imageCredit = 'Unsplash'
-    
-    for (const item of newsItems) {
-      if (item.imageUrl && item.imageUrl.startsWith('http')) {
-        const valid = await isImageValid(item.imageUrl)
-        if (valid) {
-          imageUrl = item.imageUrl
-          imageCredit = item.source
-          break
-        }
+    // Find first unprocessed tweet
+    let selectedTweet: Tweet | null = null
+    for (const tweet of tweets) {
+      const processed = await isTweetProcessed(tweet.id)
+      if (!processed) {
+        selectedTweet = tweet
+        break
       }
     }
 
-    await saveBlogPost({ slug, imageUrl, imageCredit, ...blogPost })
+    if (!selectedTweet) {
+      return Response.json({ 
+        success: false, 
+        message: 'All recent tweets already processed' 
+      })
+    }
+
+    // Generate blog post from tweet
+    const blogPost = await generateBlogPostFromTweet(selectedTweet)
+    const slug = generateSlug(blogPost.title)
+
+    // Get image - use tweet image if available, fallback to Unsplash
+    let imageUrl: string
+    let imageCredit: string
+    
+    if (selectedTweet.imageUrl && await isImageValid(selectedTweet.imageUrl)) {
+      imageUrl = selectedTweet.imageUrl
+      imageCredit = '@TheFestiveOwl'
+    } else {
+      imageUrl = getUnsplashFallback(blogPost.title)
+      imageCredit = 'Unsplash'
+    }
+
+    // Save to Supabase
+    await saveBlogPost({ 
+      slug, 
+      imageUrl, 
+      imageCredit, 
+      tweetId: selectedTweet.id,
+      ...blogPost 
+    })
 
     // Update generation log
     await fetch(`${SUPABASE_URL}/rest/v1/wcr_blog_generation_log`, {
@@ -377,9 +400,18 @@ export async function GET(req: NextRequest) {
 
     return Response.json({
       success: true,
-      post: { slug, title: blogPost.title, category: blogPost.category, url: `/blog/${slug}` },
-      posts_today: postsToday + 1,
-      news_sources_used: [...new Set(newsItems.map(n => n.source))]
+      post: { 
+        slug, 
+        title: blogPost.title, 
+        category: blogPost.category, 
+        url: `/blog/${slug}` 
+      },
+      source_tweet: {
+        id: selectedTweet.id,
+        text: selectedTweet.text.substring(0, 100) + '...',
+        link: selectedTweet.link
+      },
+      posts_today: postsToday + 1
     })
 
   } catch (error) {
@@ -406,35 +438,59 @@ export async function POST(req: NextRequest) {
   }
 
   try {
-    const newsItems = await fetchAllNews()
+    // Fetch latest tweets
+    const tweets = await fetchFestiveOwlTweets()
     
-    if (newsItems.length === 0) {
+    if (tweets.length === 0) {
       return Response.json({ 
         success: false, 
-        message: 'No news items found from RSS feeds',
-        feeds_checked: RSS_FEEDS.map(f => f.source)
+        message: 'No tweets found from @TheFestiveOwl',
+        feed_url: FESTIVE_OWL_RSS
       })
     }
 
-    const blogPost = await generateBlogPost(newsItems)
-    const slug = generateSlug(blogPost.title)
-
-    // Get image
-    let imageUrl = getUnsplashFallback(blogPost.title)
-    let imageCredit = 'Unsplash'
-    
-    for (const item of newsItems) {
-      if (item.imageUrl && item.imageUrl.startsWith('http')) {
-        const valid = await isImageValid(item.imageUrl)
-        if (valid) {
-          imageUrl = item.imageUrl
-          imageCredit = item.source
-          break
-        }
+    // Find first unprocessed tweet
+    let selectedTweet: Tweet | null = null
+    for (const tweet of tweets) {
+      const processed = await isTweetProcessed(tweet.id)
+      if (!processed) {
+        selectedTweet = tweet
+        break
       }
     }
 
-    await saveBlogPost({ slug, imageUrl, imageCredit, ...blogPost })
+    if (!selectedTweet) {
+      return Response.json({ 
+        success: false, 
+        message: 'All recent tweets already processed',
+        tweets_checked: tweets.length
+      })
+    }
+
+    // Generate blog post
+    const blogPost = await generateBlogPostFromTweet(selectedTweet)
+    const slug = generateSlug(blogPost.title)
+
+    // Get image
+    let imageUrl: string
+    let imageCredit: string
+    
+    if (selectedTweet.imageUrl && await isImageValid(selectedTweet.imageUrl)) {
+      imageUrl = selectedTweet.imageUrl
+      imageCredit = '@TheFestiveOwl'
+    } else {
+      imageUrl = getUnsplashFallback(blogPost.title)
+      imageCredit = 'Unsplash'
+    }
+
+    // Save to Supabase
+    await saveBlogPost({ 
+      slug, 
+      imageUrl, 
+      imageCredit, 
+      tweetId: selectedTweet.id,
+      ...blogPost 
+    })
 
     return Response.json({
       success: true,
@@ -448,8 +504,11 @@ export async function POST(req: NextRequest) {
         imageCredit,
         url: `/blog/${slug}`
       },
-      news_sources_used: [...new Set(newsItems.map(n => n.source))],
-      news_items_analyzed: newsItems.length
+      source_tweet: {
+        id: selectedTweet.id,
+        text: selectedTweet.text,
+        link: selectedTweet.link
+      }
     })
   } catch (error) {
     console.error('Blog generation failed:', error)
