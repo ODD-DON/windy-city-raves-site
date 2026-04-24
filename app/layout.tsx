@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from 'next'
 import { Inter, Space_Grotesk } from 'next/font/google'
 import { Analytics } from '@vercel/analytics/next'
+import { Navigation } from '@/components/navigation'
 import './globals.css'
 
 const inter = Inter({ 
@@ -215,7 +216,7 @@ export default function RootLayout({
   children: React.ReactNode
 }>) {
   return (
-    <html lang="en" className="w-full max-w-full" data-scroll-behavior="smooth">
+    <html lang="en" className="dark w-full max-w-full bg-background" data-scroll-behavior="smooth">
       <head>
         <script
           type="application/ld+json"
@@ -226,7 +227,8 @@ export default function RootLayout({
           dangerouslySetInnerHTML={{ __html: JSON.stringify(localBusinessJsonLd) }}
         />
       </head>
-      <body className={`${inter.variable} ${spaceGrotesk.variable} font-sans antialiased w-full max-w-full`}>
+      <body className={`${inter.variable} ${spaceGrotesk.variable} font-sans antialiased w-full max-w-full bg-background text-foreground`}>
+        <Navigation />
         {children}
         <Analytics />
       </body>
