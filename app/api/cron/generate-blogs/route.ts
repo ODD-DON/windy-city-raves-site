@@ -8,8 +8,13 @@ const anthropic = new Anthropic({
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!
 const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY!
 
-// The Festive Owl Nitter RSS feed - single source of truth
-const FESTIVE_OWL_RSS = 'https://nitter.poast.org/TheFestiveOwl/rss'
+// The Festive Owl Nitter RSS feed - try multiple instances
+const NITTER_INSTANCES = [
+  'https://nitter.poast.org',
+  'https://nitter.privacydev.net',
+  'https://nitter.1d4.us',
+  'https://nitter.kavin.rocks'
+]
 
 interface Tweet {
   id: string
@@ -77,18 +82,46 @@ async function isImageValid(url: string): Promise<boolean> {
 
 // Fetch tweets from The Festive Owl via Nitter RSS
 async function fetchFestiveOwlTweets(): Promise<Tweet[]> {
-  try {
-    const response = await fetch(FESTIVE_OWL_RSS, {
-      headers: { 'User-Agent': 'WindyCityRaves/1.0' },
-      next: { revalidate: 1800 } // Cache for 30 mins
-    })
+  let xml = ''
+  let successInstance = ''
+  
+  // Try each Nitter instance until one works
+  for (const instance of NITTER_INSTANCES) {
+    const rssUrl = `${instance}/TheFestiveOwl/rss`
+    console.log(`[v0] Trying Nitter instance: ${rssUrl}`)
     
-    if (!response.ok) {
-      console.error('Failed to fetch Festive Owl RSS:', response.status)
-      return []
+    try {
+      const response = await fetch(rssUrl, {
+        headers: { 
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+          'Accept': 'application/rss+xml, application/xml, text/xml, */*'
+        },
+        signal: AbortSignal.timeout(10000) // 10 second timeout
+      })
+      
+      if (response.ok) {
+        xml = await response.text()
+        if (xml.includes('<item>')) {
+          successInstance = instance
+          console.log(`[v0] Success with ${instance}, found RSS items`)
+          break
+        } else {
+          console.log(`[v0] ${instance} returned OK but no items in XML`)
+        }
+      } else {
+        console.log(`[v0] ${instance} returned status ${response.status}`)
+      }
+    } catch (err) {
+      console.log(`[v0] ${instance} failed:`, err instanceof Error ? err.message : 'unknown error')
     }
-    
-    const xml = await response.text()
+  }
+  
+  if (!xml || !xml.includes('<item>')) {
+    console.error('[v0] All Nitter instances failed or returned no items')
+    return []
+  }
+  
+  console.log(`[v0] Parsing RSS from ${successInstance}`)
     const tweets: Tweet[] = []
     
     // Parse RSS items
@@ -499,8 +532,9 @@ export async function POST(req: NextRequest) {
   if (tweets.length === 0) {
   return Response.json({
   success: false,
-  message: 'No tweets found from @TheFestiveOwl',
-  feed_url: FESTIVE_OWL_RSS
+  message: 'No tweets found from @TheFestiveOwl - all Nitter instances may be down',
+  instances_tried: NITTER_INSTANCES,
+  tip: 'Check if nitter.poast.org/TheFestiveOwl/rss loads in a browser'
   })
   }
   
