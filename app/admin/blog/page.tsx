@@ -1,16 +1,24 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useRef } from 'react'
 import { Button } from '@/components/ui/button'
-import { Loader2, Sparkles, RefreshCw } from 'lucide-react'
+import { Loader2, Sparkles, RefreshCw, Search, Edit3, Eye, Send, X, CheckCircle } from 'lucide-react'
+import Image from 'next/image'
 
 interface BlogPost {
-  id: string
   title: string
   slug: string
   excerpt: string
+  content: string
   category: string
-  published_at: string
+  tags: string[]
+  keywords: string[]
+  meta_title: string
+  meta_description: string
+  image_url: string
+  image_credit: string
+  format_detected?: string
+  original_topic?: string
 }
 
 interface GenerationStatus {
@@ -20,17 +28,37 @@ interface GenerationStatus {
   remaining: number
 }
 
+const formatLabels: Record<string, string> = {
+  list: 'Ranked List',
+  checklist: 'Checklist',
+  guide: 'How-To Guide',
+  editorial: 'Editorial'
+}
+
+const formatColors: Record<string, string> = {
+  list: 'bg-purple-100 text-purple-700',
+  checklist: 'bg-green-100 text-green-700',
+  guide: 'bg-blue-100 text-blue-700',
+  editorial: 'bg-gray-100 text-gray-700'
+}
+
 export default function BlogAdminPage() {
   const [generating, setGenerating] = useState(false)
+  const [publishing, setPublishing] = useState(false)
   const [status, setStatus] = useState<GenerationStatus | null>(null)
-  const [lastPost, setLastPost] = useState<BlogPost | null>(null)
   const [error, setError] = useState<string | null>(null)
-
-  const [newsSources, setNewsSources] = useState<string[]>([])
+  const [success, setSuccess] = useState<string | null>(null)
+  
+  // Manual generator state
+  const [topic, setTopic] = useState('')
+  const [preview, setPreview] = useState<BlogPost | null>(null)
+  const [editMode, setEditMode] = useState(false)
+  const [editedTitle, setEditedTitle] = useState('')
+  const [editedContent, setEditedContent] = useState('')
+  const contentRef = useRef<HTMLDivElement>(null)
 
   const checkStatus = async () => {
     try {
-      // Fetch today's generation log from Supabase
       const today = new Date().toISOString().split('T')[0]
       const res = await fetch(`${process.env.NEXT_PUBLIC_SUPABASE_URL}/rest/v1/wcr_blog_generation_log?date=eq.${today}`, {
         headers: {
@@ -50,14 +78,22 @@ export default function BlogAdminPage() {
     }
   }
 
-  const generatePost = async () => {
+  const generateFromTopic = async () => {
+    if (!topic.trim() || topic.trim().length < 5) {
+      setError('Topic must be at least 5 characters')
+      return
+    }
+    
     setGenerating(true)
     setError(null)
-    setNewsSources([])
+    setSuccess(null)
+    setPreview(null)
     
     try {
-      const res = await fetch('/api/cron/generate-blogs?test=true', {
+      const res = await fetch('/api/generate-blog-manual', {
         method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ topic: topic.trim() })
       })
       
       const data = await res.json()
@@ -65,20 +101,12 @@ export default function BlogAdminPage() {
       if (data.error) {
         setError(data.error + (data.details ? `: ${data.details}` : ''))
       } else if (data.success && data.post) {
-        setLastPost({
-          id: '',
-          title: data.post.title,
-          slug: data.post.slug,
-          excerpt: data.post.excerpt || '',
-          category: data.post.category,
-          published_at: new Date().toISOString()
+        setPreview({
+          ...data.post,
+          original_topic: topic.trim()
         })
-        if (data.news_sources_used) {
-          setNewsSources(data.news_sources_used)
-        }
-        await checkStatus()
-      } else if (data.message) {
-        setError(data.message)
+        setEditedTitle(data.post.title)
+        setEditedContent(data.post.content)
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Unknown error')
@@ -87,12 +115,279 @@ export default function BlogAdminPage() {
     }
   }
 
+  const publishPost = async () => {
+    if (!preview) return
+    
+    setPublishing(true)
+    setError(null)
+    
+    try {
+      const postToPublish = {
+        ...preview,
+        title: editedTitle || preview.title,
+        content: editedContent || preview.content,
+      }
+      
+      const res = await fetch('/api/generate-blog-manual', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(postToPublish)
+      })
+      
+      const data = await res.json()
+      
+      if (data.error) {
+        setError(data.error + (data.details ? `: ${data.details}` : ''))
+      } else if (data.success) {
+        setSuccess(`Published! View at /blog/${preview.slug}`)
+        setPreview(null)
+        setTopic('')
+        setEditMode(false)
+        await checkStatus()
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Unknown error')
+    } finally {
+      setPublishing(false)
+    }
+  }
+
+  const cancelPreview = () => {
+    setPreview(null)
+    setEditMode(false)
+    setEditedTitle('')
+    setEditedContent('')
+  }
+
   return (
-    <div className="max-w-4xl mx-auto py-8 px-4">
+    <div className="max-w-5xl mx-auto py-8 px-4">
       <div className="mb-8">
         <h1 className="text-2xl font-bold text-gray-900 mb-2">Blog Content Generator</h1>
         <p className="text-gray-600">Generate AI-powered blog posts about Chicago EDM scene</p>
       </div>
+
+      {/* Manual Generator */}
+      <div className="bg-white border border-gray-200 rounded-xl p-6 mb-6">
+        <h2 className="font-semibold text-gray-900 mb-4 flex items-center gap-2">
+          <Edit3 className="w-5 h-5 text-red-600" />
+          Write a Custom Post
+        </h2>
+        
+        <div className="space-y-4">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              What should the post be about?
+            </label>
+            <div className="flex gap-3">
+              <input
+                type="text"
+                value={topic}
+                onChange={(e) => setTopic(e.target.value)}
+                placeholder="e.g. top ten sets to see at Electric Forest"
+                className="flex-1 px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-red-500 text-gray-900"
+                onKeyDown={(e) => e.key === 'Enter' && !generating && generateFromTopic()}
+              />
+              <Button 
+                onClick={generateFromTopic} 
+                disabled={generating || !topic.trim()}
+                className="bg-red-600 hover:bg-red-700 text-white px-6"
+              >
+                {generating ? (
+                  <>
+                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                    Searching & Writing...
+                  </>
+                ) : (
+                  <>
+                    <Search className="w-4 h-4 mr-2" />
+                    Generate
+                  </>
+                )}
+              </Button>
+            </div>
+          </div>
+          
+          <div className="flex flex-wrap gap-2 text-sm">
+            <span className="text-gray-500">Try:</span>
+            {[
+              'top ten sets to see at Electric Forest',
+              'Electric Forest packing checklist',
+              'best Chicago techno tracks this month',
+              'first time at Spybar guide'
+            ].map((example) => (
+              <button
+                key={example}
+                onClick={() => setTopic(example)}
+                className="px-3 py-1 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-full transition-colors"
+              >
+                {example}
+              </button>
+            ))}
+          </div>
+          
+          <p className="text-xs text-gray-500">
+            AI auto-detects format: &quot;top ten&quot; = ranked list, &quot;checklist&quot; = checkbox list, &quot;guide/how to&quot; = step-by-step, else = editorial
+          </p>
+        </div>
+      </div>
+
+      {/* Error Display */}
+      {error && (
+        <div className="bg-red-50 border border-red-200 rounded-xl p-4 mb-6">
+          <p className="text-red-700 font-medium">Error</p>
+          <p className="text-red-600 text-sm">{error}</p>
+        </div>
+      )}
+
+      {/* Success Display */}
+      {success && (
+        <div className="bg-green-50 border border-green-200 rounded-xl p-4 mb-6 flex items-center gap-3">
+          <CheckCircle className="w-5 h-5 text-green-600" />
+          <div>
+            <p className="text-green-700 font-medium">Success!</p>
+            <p className="text-green-600 text-sm">{success}</p>
+          </div>
+        </div>
+      )}
+
+      {/* Preview */}
+      {preview && (
+        <div className="bg-white border-2 border-red-200 rounded-xl overflow-hidden mb-6">
+          {/* Preview Header */}
+          <div className="bg-red-50 px-6 py-4 border-b border-red-200 flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <Eye className="w-5 h-5 text-red-600" />
+              <span className="font-semibold text-gray-900">Preview</span>
+              {preview.format_detected && (
+                <span className={`text-xs font-medium px-2 py-1 rounded ${formatColors[preview.format_detected] || 'bg-gray-100 text-gray-700'}`}>
+                  {formatLabels[preview.format_detected] || preview.format_detected}
+                </span>
+              )}
+            </div>
+            <div className="flex items-center gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setEditMode(!editMode)}
+              >
+                <Edit3 className="w-4 h-4 mr-1" />
+                {editMode ? 'Preview' : 'Edit'}
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={cancelPreview}
+              >
+                <X className="w-4 h-4" />
+              </Button>
+            </div>
+          </div>
+
+          {/* Hero Image */}
+          {preview.image_url && (
+            <div className="relative h-64 bg-gray-100">
+              <Image
+                src={preview.image_url}
+                alt={preview.title}
+                fill
+                className="object-cover"
+                unoptimized
+              />
+              <div className="absolute bottom-2 right-2 text-white/80 text-xs bg-black/50 px-2 py-1 rounded">
+                {preview.image_credit}
+              </div>
+            </div>
+          )}
+
+          {/* Content */}
+          <div className="p-6">
+            {editMode ? (
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Title</label>
+                  <input
+                    type="text"
+                    value={editedTitle}
+                    onChange={(e) => setEditedTitle(e.target.value)}
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 text-gray-900 font-serif text-xl"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Content (HTML)</label>
+                  <textarea
+                    value={editedContent}
+                    onChange={(e) => setEditedContent(e.target.value)}
+                    rows={20}
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 text-gray-900 font-mono text-sm"
+                  />
+                </div>
+              </div>
+            ) : (
+              <div>
+                <div className="mb-4">
+                  <span className="text-xs font-medium text-red-600 uppercase bg-red-50 px-2 py-1 rounded">
+                    {preview.category}
+                  </span>
+                </div>
+                <h2 className="font-serif text-3xl font-bold text-gray-900 mb-3">
+                  {editedTitle || preview.title}
+                </h2>
+                <p className="text-gray-600 mb-6 text-lg">{preview.excerpt}</p>
+                
+                <div 
+                  ref={contentRef}
+                  className="prose prose-lg max-w-none
+                    prose-headings:font-serif prose-headings:font-bold
+                    prose-h2:text-2xl prose-h2:mt-8 prose-h2:mb-4
+                    prose-p:mb-6 prose-p:leading-relaxed prose-p:text-gray-800
+                    prose-strong:text-gray-900
+                    prose-blockquote:border-l-4 prose-blockquote:border-purple-500 prose-blockquote:bg-gray-50 prose-blockquote:py-4 prose-blockquote:px-6 prose-blockquote:italic
+                    prose-a:text-red-600 prose-a:no-underline hover:prose-a:underline
+                    [&_.checklist-item]:flex [&_.checklist-item]:items-start [&_.checklist-item]:gap-3 [&_.checklist-item]:py-2
+                    [&_.checklist-item_input]:mt-1 [&_.checklist-item_input]:w-5 [&_.checklist-item_input]:h-5 [&_.checklist-item_input]:accent-red-600
+                    [&_.checklist-item_label]:font-medium [&_.checklist-item_label]:text-gray-900
+                    [&_.item-note]:text-gray-500 [&_.item-note]:text-sm"
+                  dangerouslySetInnerHTML={{ __html: editedContent || preview.content }}
+                />
+                
+                {preview.tags && preview.tags.length > 0 && (
+                  <div className="mt-8 pt-6 border-t border-gray-100 flex flex-wrap gap-2">
+                    {preview.tags.map(tag => (
+                      <span key={tag} className="px-3 py-1 bg-red-50 text-red-600 rounded-full text-sm font-medium">
+                        {tag}
+                      </span>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+
+          {/* Publish Bar */}
+          <div className="bg-gray-50 px-6 py-4 border-t border-gray-200 flex items-center justify-between">
+            <div className="text-sm text-gray-500">
+              Slug: <code className="bg-gray-200 px-2 py-0.5 rounded">{preview.slug}</code>
+            </div>
+            <Button
+              onClick={publishPost}
+              disabled={publishing}
+              className="bg-green-600 hover:bg-green-700 text-white"
+            >
+              {publishing ? (
+                <>
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  Publishing...
+                </>
+              ) : (
+                <>
+                  <Send className="w-4 h-4 mr-2" />
+                  Publish to Blog
+                </>
+              )}
+            </Button>
+          </div>
+        </div>
+      )}
 
       {/* Status Card */}
       <div className="bg-white border border-gray-200 rounded-xl p-6 mb-6">
@@ -112,7 +407,7 @@ export default function BlogAdminPage() {
             </div>
             <div className="bg-gray-50 rounded-lg p-4 text-center">
               <p className="text-2xl font-bold text-cyan-600">{status.remaining}</p>
-              <p className="text-sm text-gray-600">Remaining Today</p>
+              <p className="text-sm text-gray-600">Auto Posts Left</p>
             </div>
             <div className="bg-gray-50 rounded-lg p-4 text-center">
               <p className="text-2xl font-bold text-gray-900">{status.topics_used.length}</p>
@@ -124,17 +419,34 @@ export default function BlogAdminPage() {
         )}
       </div>
 
-      {/* Generate Button */}
-      <div className="bg-gradient-to-r from-red-50 to-cyan-50 border border-gray-200 rounded-xl p-6 mb-6">
+      {/* Auto-Generate from RSS */}
+      <div className="bg-gradient-to-r from-gray-50 to-gray-100 border border-gray-200 rounded-xl p-6">
         <div className="text-center">
-          <h2 className="font-semibold text-gray-900 mb-2">Generate New Post</h2>
+          <h2 className="font-semibold text-gray-900 mb-2">Auto-Generate from News</h2>
           <p className="text-gray-600 text-sm mb-4">
-            AI will create an SEO-optimized blog post about Chicago EDM events, venues, or artists
+            Pull latest from Dancing Astronaut, Mixmag, Billboard Dance and generate a post
           </p>
           <Button 
-            onClick={generatePost} 
+            onClick={async () => {
+              setGenerating(true)
+              setError(null)
+              try {
+                const res = await fetch('/api/cron/generate-blogs?test=true', { method: 'POST' })
+                const data = await res.json()
+                if (data.error) {
+                  setError(data.error)
+                } else if (data.success) {
+                  setSuccess(`Auto-generated: ${data.post?.title || 'New post created'}`)
+                }
+              } catch (err) {
+                setError(err instanceof Error ? err.message : 'Unknown error')
+              } finally {
+                setGenerating(false)
+              }
+            }}
             disabled={generating}
-            className="bg-red-600 hover:bg-red-700 text-white"
+            variant="outline"
+            className="border-gray-300"
           >
             {generating ? (
               <>
@@ -144,51 +456,12 @@ export default function BlogAdminPage() {
             ) : (
               <>
                 <Sparkles className="w-4 h-4 mr-2" />
-                Generate Blog Post
+                Generate from RSS
               </>
             )}
           </Button>
         </div>
       </div>
-
-      {/* Error Display */}
-      {error && (
-        <div className="bg-red-50 border border-red-200 rounded-xl p-4 mb-6">
-          <p className="text-red-700 font-medium">Error</p>
-          <p className="text-red-600 text-sm">{error}</p>
-        </div>
-      )}
-
-      {/* Last Generated Post */}
-      {lastPost && (
-        <div className="bg-white border border-gray-200 rounded-xl p-6">
-          <h2 className="font-semibold text-gray-900 mb-4">Last Generated Post</h2>
-          <div className="space-y-3">
-            <div className="flex flex-wrap gap-2">
-              <span className="text-xs font-medium text-red-600 uppercase bg-red-50 px-2 py-1 rounded">
-                {lastPost.category}
-              </span>
-              {newsSources.length > 0 && newsSources.map(source => (
-                <span key={source} className="text-xs font-medium text-cyan-600 bg-cyan-50 px-2 py-1 rounded">
-                  {source}
-                </span>
-              ))}
-            </div>
-            <h3 className="text-xl font-bold text-gray-900">{lastPost.title}</h3>
-            <p className="text-gray-600">{lastPost.excerpt}</p>
-            <div className="pt-4 border-t border-gray-100">
-              <a 
-                href={`/blog/${lastPost.slug}`}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-red-600 hover:text-red-700 font-medium text-sm"
-              >
-                View Post →
-              </a>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   )
 }
