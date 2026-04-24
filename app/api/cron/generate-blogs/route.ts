@@ -123,7 +123,7 @@ async function generateBlogPost(newsItems: RSSItem[]): Promise<{
   ).join('\n---\n')
 
   const { text } = await generateText({
-    model: anthropic('claude-3-5-haiku-latest'),
+    model: anthropic('claude-haiku-4-5-20251001'),
     prompt: `You are a music journalist writing for Windy City Raves, Chicago's premier electronic music community platform.
 
 Based on the following REAL, CURRENT EDM news items, write an original, engaging blog post that covers the most interesting story or combines related stories into a compelling narrative.
@@ -329,8 +329,12 @@ export async function POST(req: NextRequest) {
   }
 
   try {
+    console.log('[v0] Starting blog generation...')
+    console.log('[v0] ANTHROPIC_API_KEY exists:', !!process.env.ANTHROPIC_API_KEY)
+    
     // Fetch latest news from RSS feeds
     const newsItems = await fetchAllNews()
+    console.log('[v0] Fetched news items:', newsItems.length)
     
     if (newsItems.length === 0) {
       return Response.json({ 
@@ -340,8 +344,10 @@ export async function POST(req: NextRequest) {
       })
     }
 
+    console.log('[v0] Calling Claude Haiku...')
     // Generate blog post from real news
     const blogPost = await generateBlogPost(newsItems)
+    console.log('[v0] Blog post generated:', blogPost.title)
     const slug = generateSlug(blogPost.title)
 
     // Save to database
