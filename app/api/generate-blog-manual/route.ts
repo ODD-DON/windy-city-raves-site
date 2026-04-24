@@ -1,7 +1,6 @@
-import { generateText } from 'ai'
-import { createAnthropic } from '@ai-sdk/anthropic'
+import Anthropic from '@anthropic-ai/sdk'
 
-const anthropic = createAnthropic({
+const anthropic = new Anthropic({
   apiKey: process.env.ANTHROPIC_API_KEY!,
 })
 
@@ -37,71 +36,6 @@ function extractKeywords(topic: string): string {
   return ['EDM', 'festival', ...words].join(',')
 }
 
-// Search the web using Brave Search API or fallback
-async function searchWeb(query: string): Promise<string[]> {
-  const results: string[] = []
-  
-  // Try Brave Search first
-  const braveApiKey = process.env.BRAVE_API_KEY
-  if (braveApiKey) {
-    try {
-      const response = await fetch(`https://api.search.brave.com/res/v1/web/search?q=${encodeURIComponent(query)}&count=10`, {
-        headers: {
-          'Accept': 'application/json',
-          'X-Subscription-Token': braveApiKey
-        }
-      })
-      
-      if (response.ok) {
-        const data = await response.json()
-        if (data.web?.results) {
-          for (const result of data.web.results.slice(0, 8)) {
-            results.push(`${result.title}: ${result.description}`)
-          }
-        }
-        return results
-      }
-    } catch (e) {
-      console.log('[v0] Brave search failed:', e)
-    }
-  }
-  
-  // Try Tavily as fallback
-  const tavilyApiKey = process.env.TAVILY_API_KEY
-  if (tavilyApiKey) {
-    try {
-      const response = await fetch('https://api.tavily.com/search', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          api_key: tavilyApiKey,
-          query: query,
-          search_depth: 'basic',
-          max_results: 8
-        })
-      })
-      
-      if (response.ok) {
-        const data = await response.json()
-        if (data.results) {
-          for (const result of data.results) {
-            results.push(`${result.title}: ${result.content?.slice(0, 300) || ''}`)
-          }
-        }
-        return results
-      }
-    } catch (e) {
-      console.log('[v0] Tavily search failed:', e)
-    }
-  }
-  
-  // No search API available - return empty but continue
-  console.log('[v0] No search API available, generating without web context')
-  return results
-}
-
 // Generate slug from title
 function generateSlug(title: string): string {
   return title
@@ -113,6 +47,65 @@ function generateSlug(title: string): string {
     .slice(0, 80)
 }
 
+// Format-specific instructions
+const formatInstructions: Record<string, string> = {
+  list: `This is a RANKED LIST post. Structure:
+- Start with a punchy intro (2-3 sentences, no "here are" or "let's dive into")
+- Then NUMBER each item 1-10 (or however many make sense)
+- Each item gets: <h2>NUMBER. Item Name</h2> followed by a short paragraph (2-3 sentences) explaining why it's on the list
+- Bold the key names/venues with <strong>
+- End with a short outro, no "in conclusion"`,
+  
+  checklist: `This is a CHECKLIST post. Structure:
+- Start with a punchy intro about why this matters
+- Use a styled checklist format with checkboxes
+- Group items into categories with <h2> headers
+- Format each item as: <div class="checklist-item"><input type="checkbox" disabled /><label>Item name</label><span class="item-note">brief note if needed</span></div>
+- Add pro tips between sections in <blockquote> tags
+- Keep it practical and specific`,
+  
+  guide: `This is a HOW-TO GUIDE. Structure:
+- Start with why this guide matters (hook, not summary)
+- Break into clear STEPS with <h2>Step 1: Action Verb</h2> format
+- Each step gets 2-3 paragraphs max
+- Include insider tips in <blockquote> tags
+- End with a "you got this" type closer, not a summary`,
+  
+  editorial: `This is an EDITORIAL post. Structure:
+- Start with a hook that makes people want to read more
+- Use <h2> to break into 2-3 sections if the topic is complex
+- Short punchy paragraphs, 2-3 sentences each
+- Include opinions and hot takes
+- Reference Chicago scene when relevant
+- End strong, not with a summary`
+}
+
+// System prompt for Claude
+const SYSTEM_PROMPT = `You are a writer for Windy City Raves, a Chicago underground EDM blog.
+
+Before writing anything, search the web for current, accurate information about the topic. Run as many searches as you need to get real facts, real names, real dates, and real lineups. Never write from memory alone.
+
+Then write the post using only what you found. If you couldn't find something, don't make it up.
+
+Writing rules:
+- Sound like a 28 year old Chicago raver texting their friends about it
+- Short punchy paragraphs, 2-3 sentences max
+- Opinionated. "This set will rip." "Don't sleep on this." That's the voice.
+- No em dashes
+- No AI filler words: "it's worth noting", "dive into", "delve", "seamlessly", "robust", "game-changer", "landscape"
+- No bullet summaries or "In conclusion" endings
+- No subheadings that sound like listicle titles
+- Reference Chicago culture when relevant
+- Start with a hook, not a summary
+- Detect the format from the topic automatically: numbered list, checklist, guide, or standard post
+
+HTML FORMATTING:
+- Wrap all paragraphs in <p> tags
+- Use <h2> for section breaks
+- Use <strong> for artist names, venue names, dates
+- Use <em> for track/album titles
+- Use <blockquote> for standout quotes or pro tips`
+
 export async function POST(req: Request) {
   try {
     const { topic } = await req.json()
@@ -123,76 +116,28 @@ export async function POST(req: Request) {
     
     const format = detectFormat(topic)
     const keywords = extractKeywords(topic)
-    
-    // Search for current info
-    const searchResults = await searchWeb(`${topic} 2024 2025`)
-    const webContext = searchResults.length > 0 
-      ? `\n\nWEB SEARCH RESULTS (use these for current, accurate info):\n${searchResults.join('\n\n')}`
-      : ''
-    
-    // Format-specific instructions
-    const formatInstructions: Record<string, string> = {
-      list: `This is a RANKED LIST post. Structure:
-- Start with a punchy intro (2-3 sentences, no "here are" or "let's dive into")
-- Then NUMBER each item 1-10 (or however many make sense)
-- Each item gets: <h2>NUMBER. Item Name</h2> followed by a short paragraph (2-3 sentences) explaining why it's on the list
-- Bold the key names/venues
-- End with a short outro, no "in conclusion"`,
-      
-      checklist: `This is a CHECKLIST post. Structure:
-- Start with a punchy intro about why this matters
-- Use a styled checklist format with checkboxes
-- Group items into categories with <h2> headers
-- Format each item as: <div class="checklist-item"><input type="checkbox" disabled /><label>Item name</label><span class="item-note">brief note if needed</span></div>
-- Add pro tips between sections
-- Keep it practical and specific`,
-      
-      guide: `This is a HOW-TO GUIDE. Structure:
-- Start with why this guide matters (hook, not summary)
-- Break into clear STEPS with <h2>Step 1: Action Verb</h2> format
-- Each step gets 2-3 paragraphs max
-- Include insider tips in <blockquote> tags
-- End with a "you got this" type closer, not a summary`,
-      
-      editorial: `This is an EDITORIAL post. Structure:
-- Start with a hook that makes people want to read more
-- Use <h2> to break into 2-3 sections if the topic is complex
-- Short punchy paragraphs, 2-3 sentences each
-- Include opinions and hot takes
-- Reference Chicago scene when relevant
-- End strong, not with a summary`
-    }
-    
-    const systemPrompt = `You are a writer for Windy City Raves, a Chicago underground EDM blog. Write like a real scene insider.
 
-VOICE RULES (STRICT):
-- Never use em dashes (—). Use commas or periods instead.
-- BANNED PHRASES (never use): "it's worth noting", "dive into", "delve", "seamlessly", "robust", "game-changer", "in the realm of", "landscape", "in conclusion", "to summarize", "without further ado", "let's explore", "here are", "comprehensive"
-- No bullet summaries or list intros like "Here are the top..."
-- Short paragraphs: 2-3 sentences MAX
-- Sound like a 28 year old Chicago raver texting friends about a show
-- Opinions are encouraged: "This set ripped." "Skip the opener." "Trust me on this one."
-- Reference Chicago culture, venues, and vibe when relevant
-- Start with a HOOK, not a summary or intro statement
+    // Call Claude with web search enabled
+    const response = await anthropic.messages.create({
+      model: 'claude-haiku-4-5-20251001',
+      max_tokens: 4000,
+      system: SYSTEM_PROMPT,
+      tools: [
+        {
+          type: 'web_search_20250305',
+          name: 'web_search',
+        }
+      ],
+      messages: [
+        {
+          role: 'user',
+          content: `Write a blog post about: "${topic}"
+
+Format type detected: ${format.toUpperCase()}
 
 ${formatInstructions[format]}
 
-HTML FORMATTING:
-- Wrap all paragraphs in <p> tags
-- Use <h2> for section breaks (with Playfair Display font styling)
-- Use <strong> for artist names, venue names, dates
-- Use <em> for track/album titles
-- Use <blockquote> for standout quotes or pro tips`
-
-    const { text } = await generateText({
-      model: anthropic('claude-haiku-4-5-20251001'),
-      system: systemPrompt,
-      prompt: `Write a blog post about: "${topic}"
-
-Format type detected: ${format.toUpperCase()}
-${webContext}
-
-Respond ONLY with valid JSON (no markdown code blocks):
+After searching and writing, respond with ONLY valid JSON (no markdown code blocks, no explanation):
 {
   "title": "Catchy headline, 50-70 chars, no clickbait",
   "excerpt": "Hook for social sharing, 150-200 chars",
@@ -202,24 +147,33 @@ Respond ONLY with valid JSON (no markdown code blocks):
   "keywords": ["8-10", "seo", "keywords"],
   "category": "scene-news or artist-spotlight or festival-news or venue-guide",
   "tags": ["relevant", "tags"]
-}`,
-      maxOutputTokens: 4000,
+}`
+        }
+      ]
     })
+
+    // Extract text content from response
+    let fullText = ''
+    for (const block of response.content) {
+      if (block.type === 'text') {
+        fullText += block.text
+      }
+    }
 
     // Parse Claude's response
     let parsed
     try {
-      const jsonMatch = text.match(/\{[\s\S]*\}/)
+      const jsonMatch = fullText.match(/\{[\s\S]*\}/)
       if (!jsonMatch) throw new Error('No JSON found in response')
       parsed = JSON.parse(jsonMatch[0])
     } catch (e) {
       return Response.json({ 
         error: 'Failed to parse Claude response',
-        raw: text.slice(0, 500)
+        raw: fullText.slice(0, 1000)
       }, { status: 500 })
     }
 
-    // Generate image URL
+    // Generate image URL from Unsplash
     const imageUrl = `https://source.unsplash.com/1200x630/?${encodeURIComponent(keywords)}`
     
     // Generate slug
@@ -241,9 +195,10 @@ Respond ONLY with valid JSON (no markdown code blocks):
         meta_description: parsed.metaDescription,
         image_url: imageUrl,
         image_credit: 'Unsplash',
-        format_detected: format
+        format_detected: format,
+        original_topic: topic
       },
-      search_results_used: searchResults.length
+      web_search_used: true
     })
 
   } catch (error) {
