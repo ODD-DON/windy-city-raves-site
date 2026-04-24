@@ -99,12 +99,13 @@ Writing rules:
 - Start with a hook, not a summary
 - Detect the format from the topic automatically: numbered list, checklist, guide, or standard post
 
-HTML FORMATTING:
-- Wrap all paragraphs in <p> tags
-- Use <h2> for section breaks
+FORMAT YOUR RESPONSE AS CLEAN HTML:
+- Wrap EVERY paragraph in <p> tags. No exceptions. No plain text.
+- Subheadings go in <h2> tags
 - Use <strong> for artist names, venue names, dates
 - Use <em> for track/album titles
-- Use <blockquote> for standout quotes or pro tips`
+- Use <blockquote> for standout quotes or pro tips
+- NO MARKDOWN. No **bold** or *italic*. Only HTML tags.`
 
 export async function POST(req: Request) {
   try {

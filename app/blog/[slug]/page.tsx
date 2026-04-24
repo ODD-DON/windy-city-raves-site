@@ -111,15 +111,31 @@ const categoryColors: Record<string, string> = {
   'festival-news': 'bg-pink-500 text-white',
 }
 
-// Process content to add drop cap and ensure proper paragraph formatting
+// Process content to add drop cap, strip markdown, and ensure proper paragraph formatting
 function processContent(content: string): string {
   let processed = content
+  
+  // Strip any leftover markdown and convert to HTML
+  processed = processed.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>') // **bold** -> <strong>
+  processed = processed.replace(/\*([^*]+)\*/g, '<em>$1</em>') // *italic* -> <em>
+  processed = processed.replace(/__([^_]+)__/g, '<strong>$1</strong>') // __bold__ -> <strong>
+  processed = processed.replace(/_([^_]+)_/g, '<em>$1</em>') // _italic_ -> <em>
+  processed = processed.replace(/^### (.+)$/gm, '<h3>$1</h3>') // ### heading
+  processed = processed.replace(/^## (.+)$/gm, '<h2>$1</h2>') // ## heading
+  processed = processed.replace(/^# (.+)$/gm, '<h2>$1</h2>') // # heading (treat as h2)
   
   // If content doesn't have <p> tags, wrap paragraphs
   if (!processed.includes('<p>')) {
     // Split by double newlines or single newlines
     const paragraphs = processed.split(/\n\n+|\n/).filter(p => p.trim())
-    processed = paragraphs.map(p => `<p>${p.trim()}</p>`).join('\n')
+    processed = paragraphs.map(p => {
+      const trimmed = p.trim()
+      // Don't wrap if it's already a block element
+      if (trimmed.startsWith('<h') || trimmed.startsWith('<blockquote') || trimmed.startsWith('<ul') || trimmed.startsWith('<ol') || trimmed.startsWith('<div')) {
+        return trimmed
+      }
+      return `<p>${trimmed}</p>`
+    }).join('\n')
   }
   
   // Clean up any empty paragraphs
@@ -199,76 +215,73 @@ export default async function BlogPostPage({ params }: { params: Promise<{ slug:
           padding-top: 0.25rem;
         }
         
-        .article-body p {
-          margin-bottom: 1.75rem !important;
-          line-height: 1.85;
-          color: #374151;
+        .prose p {
+          margin-bottom: 1.5rem !important;
+          line-height: 1.75 !important;
+          color: #374151 !important;
         }
         
-        .article-body p:last-child {
+        .prose p:last-child {
           margin-bottom: 0 !important;
         }
         
-        .article-body h2 {
+        .prose h2 {
           font-family: var(--font-playfair), Georgia, serif;
-          font-size: 1.75rem;
-          font-weight: 700;
-          color: #111827;
-          margin-top: 2.5rem;
-          margin-bottom: 1rem;
+          font-size: 1.5rem !important;
+          font-weight: 700 !important;
+          color: #111827 !important;
+          margin-top: 2.5rem !important;
+          margin-bottom: 1rem !important;
         }
         
-        .article-body h3 {
-          font-size: 1.25rem;
-          font-weight: 600;
-          color: #1f2937;
-          margin-top: 2rem;
-          margin-bottom: 0.75rem;
+        .prose h3 {
+          font-size: 1.25rem !important;
+          font-weight: 600 !important;
+          color: #1f2937 !important;
+          margin-top: 2rem !important;
+          margin-bottom: 0.75rem !important;
         }
         
-        .article-body strong, .article-body b {
-          font-weight: 600;
-          color: #111827;
+        .prose strong, .prose b {
+          font-weight: 600 !important;
+          color: #111827 !important;
         }
         
-        .article-body em, .article-body i {
-          font-style: italic;
-          color: #4b5563;
+        .prose em, .prose i {
+          font-style: italic !important;
+          color: #4b5563 !important;
         }
         
-        .article-body a {
-          color: #dc2626;
-          text-decoration: none;
-          border-bottom: 1px solid transparent;
-          transition: border-color 0.2s;
+        .prose a {
+          color: #dc2626 !important;
+          text-decoration: none !important;
         }
         
-        .article-body a:hover {
-          border-bottom-color: #dc2626;
+        .prose a:hover {
+          text-decoration: underline !important;
         }
         
-        .article-body blockquote {
-          border-left: 4px solid #8b5cf6;
-          background: #f9fafb;
-          padding: 1.5rem 2rem;
-          margin: 2rem 0;
-          font-size: 1.25rem;
-          font-style: italic;
-          color: #4b5563;
-          border-radius: 0 0.5rem 0.5rem 0;
+        .prose blockquote {
+          border-left: 4px solid #8b5cf6 !important;
+          background: #f9fafb !important;
+          padding: 1rem 1.5rem !important;
+          margin: 2rem 0 !important;
+          font-style: italic !important;
+          color: #4b5563 !important;
+          border-radius: 0 0.5rem 0.5rem 0 !important;
         }
         
-        .article-body blockquote p {
-          margin-bottom: 0;
+        .prose blockquote p {
+          margin-bottom: 0 !important;
         }
         
-        .article-body ul, .article-body ol {
-          margin-bottom: 1.5rem;
-          padding-left: 1.5rem;
+        .prose ul, .prose ol {
+          margin-bottom: 1.5rem !important;
+          padding-left: 1.5rem !important;
         }
         
-        .article-body li {
-          margin-bottom: 0.5rem;
+        .prose li {
+          margin-bottom: 0.5rem !important;
         }
         
         .article-body .embed-container {
@@ -374,7 +387,7 @@ export default async function BlogPostPage({ params }: { params: Promise<{ slug:
           {/* 6. Body Content - Constrained width for readability */}
           <div className="max-w-2xl mx-auto px-4 pb-16">
             <div 
-              className="article-body text-lg text-gray-800 leading-relaxed"
+              className="prose prose-lg max-w-2xl mx-auto article-body"
               dangerouslySetInnerHTML={{ __html: processedContent }}
             />
             
