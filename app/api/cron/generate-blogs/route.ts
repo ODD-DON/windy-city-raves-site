@@ -26,6 +26,127 @@ interface RSSItem {
   pubDate: string
   source: string
   imageUrl?: string
+  rawContent?: string // Store raw content for embed detection
+}
+
+// Check if image URL is valid
+async function isImageValid(url: string): Promise<boolean> {
+  try {
+    const response = await fetch(url, { method: 'HEAD' })
+    const contentType = response.headers.get('content-type')
+    return response.ok && (contentType?.startsWith('image/') || false)
+  } catch {
+    return false
+  }
+}
+
+// Generate Unsplash fallback URL from title keywords
+function getUnsplashFallback(title: string): string {
+  // Extract meaningful keywords from title
+  const stopWords = ['the', 'a', 'an', 'and', 'or', 'but', 'in', 'on', 'at', 'to', 'for', 'of', 'with', 'by', 'is', 'are', 'was', 'were', 'new', 'announces', 'releases', 'drops', 'reveals']
+  const keywords = title
+    .toLowerCase()
+    .replace(/[^a-z0-9\s]/g, '')
+    .split(/\s+/)
+    .filter(word => word.length > 2 && !stopWords.includes(word))
+    .slice(0, 3)
+    .join(',')
+  
+  return `https://source.unsplash.com/1200x630/?EDM,festival,${keywords || 'concert,rave'}`
+}
+
+// Detect embeds from article content/link
+interface Embeds {
+  twitter?: string[]
+  soundcloud?: string[]
+  spotify?: string[]
+  mainArtist?: string
+}
+
+function detectEmbeds(content: string, title: string): Embeds {
+  const embeds: Embeds = {}
+  
+  // Twitter/X links
+  const twitterRegex = /https?:\/\/(twitter\.com|x\.com)\/\w+\/status\/(\d+)/gi
+  const twitterMatches = content.match(twitterRegex)
+  if (twitterMatches) {
+    embeds.twitter = twitterMatches.slice(0, 2) // Max 2 tweets
+  }
+  
+  // SoundCloud links
+  const soundcloudRegex = /https?:\/\/(www\.)?soundcloud\.com\/[\w-]+\/[\w-]+/gi
+  const soundcloudMatches = content.match(soundcloudRegex)
+  if (soundcloudMatches) {
+    embeds.soundcloud = soundcloudMatches.slice(0, 1) // Max 1
+  }
+  
+  // Spotify links
+  const spotifyRegex = /https?:\/\/open\.spotify\.com\/(track|album|playlist)\/[\w]+/gi
+  const spotifyMatches = content.match(spotifyRegex)
+  if (spotifyMatches) {
+    embeds.spotify = spotifyMatches.slice(0, 1)
+  }
+  
+  // Extract main artist name from title for Spotify search fallback
+  // Common patterns: "Artist Name Releases...", "Artist Name Announces...", "Artist Name's New..."
+  const artistMatch = title.match(/^([A-Z][a-zA-Z\s&]+?)(?:\s+(?:Releases|Announces|Drops|Reveals|Shares|Debuts|Premieres|Unveils|Returns|Teams|Joins|Delivers|'s))/i)
+  if (artistMatch) {
+    embeds.mainArtist = artistMatch[1].trim()
+  }
+  
+  return embeds
+}
+
+// Generate embed HTML
+function generateEmbedHTML(embeds: Embeds): string {
+  let html = ''
+  
+  // Twitter embeds
+  if (embeds.twitter && embeds.twitter.length > 0) {
+    html += '\n<div class="embed-container twitter-embed">'
+    for (const tweetUrl of embeds.twitter) {
+      html += `
+<blockquote class="twitter-tweet">
+  <a href="${tweetUrl}"></a>
+</blockquote>`
+    }
+    html += '\n<script async src="https://platform.twitter.com/widgets.js" charset="utf-8"></script>'
+    html += '\n</div>'
+  }
+  
+  // SoundCloud embeds
+  if (embeds.soundcloud && embeds.soundcloud.length > 0) {
+    for (const scUrl of embeds.soundcloud) {
+      html += `
+<div class="embed-container soundcloud-embed">
+  <iframe width="100%" height="166" scrolling="no" frameborder="no" allow="autoplay" 
+    src="https://w.soundcloud.com/player/?url=${encodeURIComponent(scUrl)}&color=%23ff5500&auto_play=false&hide_related=false&show_comments=true&show_user=true&show_reposts=false&show_teaser=true">
+  </iframe>
+</div>`
+    }
+  }
+  
+  // Spotify embeds
+  if (embeds.spotify && embeds.spotify.length > 0) {
+    for (const spotifyUrl of embeds.spotify) {
+      // Convert open.spotify.com URL to embed URL
+      const embedUrl = spotifyUrl.replace('open.spotify.com/', 'open.spotify.com/embed/')
+      html += `
+<div class="embed-container spotify-embed">
+  <iframe style="border-radius:12px" src="${embedUrl}" width="100%" height="152" frameBorder="0" allowfullscreen="" allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture" loading="lazy"></iframe>
+</div>`
+    }
+  } else if (embeds.mainArtist && !embeds.soundcloud?.length) {
+    // Fallback: Spotify search for the main artist
+    const searchQuery = encodeURIComponent(embeds.mainArtist)
+    html += `
+<div class="embed-container spotify-search">
+  <p class="text-sm text-gray-500 mb-2">Listen to ${embeds.mainArtist} on Spotify:</p>
+  <iframe style="border-radius:12px" src="https://open.spotify.com/embed/search/${searchQuery}" width="100%" height="152" frameBorder="0" allowfullscreen="" allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture" loading="lazy"></iframe>
+</div>`
+  }
+  
+  return html
 }
 
 // Parse RSS feed and extract items
@@ -51,6 +172,7 @@ async function fetchRSSFeed(feedUrl: string, source: string): Promise<RSSItem[]>
       const description = itemXml.match(/<description><!\[CDATA\[(.*?)\]\]><\/description>/)?.[1] ||
                           itemXml.match(/<description>(.*?)<\/description>/)?.[1] || ''
       const pubDate = itemXml.match(/<pubDate>(.*?)<\/pubDate>/)?.[1] || ''
+      const contentEncoded = itemXml.match(/<content:encoded><!\[CDATA\[([\s\S]*?)\]\]><\/content:encoded>/)?.[1] || ''
       
       // Try to extract image from media:content or enclosure
       const imageUrl = itemXml.match(/<media:content[^>]*url="([^"]+)"/)?.[1] ||
@@ -64,7 +186,8 @@ async function fetchRSSFeed(feedUrl: string, source: string): Promise<RSSItem[]>
           description: description.replace(/<[^>]*>/g, '').substring(0, 500),
           pubDate,
           source,
-          imageUrl
+          imageUrl,
+          rawContent: contentEncoded || description
         })
       }
     }
@@ -105,7 +228,37 @@ function generateSlug(title: string): string {
   return `${baseSlug}-${timestamp}`
 }
 
-// Generate blog post using Claude Haiku via Vercel AI Gateway
+// WCR Chicago raver writing voice system prompt
+const WCR_SYSTEM_PROMPT = `You are a writer for Windy City Raves, a Chicago underground EDM blog. Write like a real scene insider.
+
+VOICE & STYLE:
+- Sound like a 28 year old Chicago raver texting their friends about a show
+- Short punchy paragraphs, 2-3 sentences max
+- Conversational, opinionated, specific
+- Opinions are encouraged: "This set ripped." "Skip the opener." "Absolute heater."
+- Reference Chicago culture when relevant (venues like Radius, Sound-Bar, Prysm, Concord; neighborhoods; the scene)
+- Start with a hook, not a summary
+- No "In conclusion" or summary endings
+
+FORBIDDEN:
+- Never use em dashes (—)
+- No AI filler phrases: "it's worth noting", "dive into", "delve", "seamlessly", "robust", "game-changer", "in the realm of", "landscape", "elevate", "curated", "arguably"
+- No bullet point summaries
+- No formal journalist voice
+- No hedging or excessive qualifiers
+
+GOOD EXAMPLES:
+- "Aight so Fred again.. just dropped something wild."
+- "If you weren't at Radius last weekend you missed out. Big time."
+- "This track goes stupid hard. Had it on repeat since 6am."
+- "Chicago heads already know, but for everyone else catching up..."
+
+BAD EXAMPLES (never write like this):
+- "It's worth noting that the artist has seamlessly blended..."
+- "In the ever-evolving landscape of electronic music..."
+- "This robust release delves into..."`
+
+// Generate blog post using Claude Haiku
 async function generateBlogPost(newsItems: RSSItem[]): Promise<{
   title: string
   excerpt: string
@@ -117,59 +270,88 @@ async function generateBlogPost(newsItems: RSSItem[]): Promise<{
   tags: string[]
   imageUrl?: string
   imageCredit?: string
+  embeds: Embeds
 }> {
   const newsContext = newsItems.map(item => 
-    `SOURCE: ${item.source}\nTITLE: ${item.title}\nSUMMARY: ${item.description}\nDATE: ${item.pubDate}\n`
+    `SOURCE: ${item.source}\nTITLE: ${item.title}\nSUMMARY: ${item.description}\nLINK: ${item.link}\nDATE: ${item.pubDate}\n`
   ).join('\n---\n')
 
   const { text } = await generateText({
     model: anthropic('claude-haiku-4-5-20251001'),
-    prompt: `You are a music journalist writing for Windy City Raves, Chicago's premier electronic music community platform.
+    system: WCR_SYSTEM_PROMPT,
+    prompt: `Based on the following REAL, CURRENT EDM news, write an original blog post for Windy City Raves.
 
-Based on the following REAL, CURRENT EDM news items, write an original, engaging blog post that covers the most interesting story or combines related stories into a compelling narrative.
+Pick the most interesting story and write about it. Make it feel like you're putting your Chicago homies onto something.
 
-CURRENT EDM NEWS (from today's feeds):
+CURRENT EDM NEWS:
 ${newsContext}
 
-Write the blog post in the following JSON format (respond ONLY with valid JSON, no markdown code blocks):
+Respond ONLY with valid JSON (no markdown code blocks):
 {
-  "title": "Catchy, SEO-optimized headline that accurately reflects the news (50-70 chars)",
-  "excerpt": "Engaging summary for social sharing (150-200 chars)",
-  "content": "Full article in HTML format with <p>, <h2>, <h3>, <strong>, <em> tags. Include 4-6 paragraphs. Reference Chicago's scene where relevant - how this news affects Chicago ravers, upcoming Chicago shows by these artists, etc.",
-  "metaTitle": "SEO title including artist/event name + 'Chicago EDM' (50-60 chars)",
-  "metaDescription": "SEO description with key details (150-160 chars)",
-  "keywords": ["array", "of", "8-10", "seo", "keywords", "artist-names", "chicago", "edm", "genre"],
-  "category": "one of: scene-news, artist-spotlight, festival-news, industry-news",
-  "tags": ["relevant", "tags", "artist-names", "genres", "labels"]
+  "title": "Catchy headline, no clickbait, 50-70 chars",
+  "excerpt": "Hook for social sharing, 150-200 chars, make people want to click",
+  "content": "Full article in HTML with <p> tags. 4-6 short paragraphs. Connect to Chicago scene when possible. Sound like WCR voice.",
+  "metaTitle": "SEO title with artist name + Chicago EDM, 50-60 chars",
+  "metaDescription": "SEO description, 150-160 chars",
+  "keywords": ["8-10", "seo", "keywords", "artist-names", "chicago-edm"],
+  "category": "scene-news or artist-spotlight or festival-news or industry-news",
+  "tags": ["relevant", "tags", "genres", "artist-names"]
 }
 
-IMPORTANT: 
-- Write about REAL news from the feed above - do not make up events or announcements
-- Include actual artist names, venues, dates mentioned in the news
-- Connect it to Chicago's scene when possible
-- Focus on SEO: include artist names, song titles, label names in keywords`,
+Remember: Write about REAL news from above. Short paragraphs. Chicago voice. No em dashes. No AI filler.`,
     maxOutputTokens: 2000,
   })
 
   try {
-    // Clean the response - remove any markdown code blocks if present
+    // Clean the response
     const cleanedText = text.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim()
     const parsed = JSON.parse(cleanedText)
     
-    // Find an image from the news items
-    const itemWithImage = newsItems.find(item => item.imageUrl)
+    // Find embeds from source articles
+    const mainNewsItem = newsItems[0]
+    const embeds = detectEmbeds(mainNewsItem.rawContent || mainNewsItem.description, mainNewsItem.title)
+    
+    // Find a valid image or use Unsplash fallback
+    let finalImageUrl: string | undefined
+    let imageCredit: string | undefined
+    
+    // Try to find a valid image from news items
+    for (const item of newsItems) {
+      if (item.imageUrl) {
+        const isValid = await isImageValid(item.imageUrl)
+        if (isValid) {
+          finalImageUrl = item.imageUrl
+          imageCredit = item.source
+          break
+        }
+      }
+    }
+    
+    // Fallback to Unsplash if no valid image found
+    if (!finalImageUrl) {
+      finalImageUrl = getUnsplashFallback(parsed.title)
+      imageCredit = 'Unsplash'
+    }
+    
+    // Append embeds to content
+    let finalContent = parsed.content
+    const embedHTML = generateEmbedHTML(embeds)
+    if (embedHTML) {
+      finalContent += '\n' + embedHTML
+    }
     
     return {
       title: parsed.title,
       excerpt: parsed.excerpt,
-      content: parsed.content,
+      content: finalContent,
       metaTitle: parsed.metaTitle,
       metaDescription: parsed.metaDescription,
       keywords: parsed.keywords || [],
       category: parsed.category || 'scene-news',
       tags: parsed.tags || [],
-      imageUrl: itemWithImage?.imageUrl,
-      imageCredit: itemWithImage?.source
+      imageUrl: finalImageUrl,
+      imageCredit,
+      embeds
     }
   } catch (error) {
     console.error('Failed to parse AI response:', text)
@@ -329,12 +511,8 @@ export async function POST(req: NextRequest) {
   }
 
   try {
-    console.log('[v0] Starting blog generation...')
-    console.log('[v0] ANTHROPIC_API_KEY exists:', !!process.env.ANTHROPIC_API_KEY)
-    
     // Fetch latest news from RSS feeds
     const newsItems = await fetchAllNews()
-    console.log('[v0] Fetched news items:', newsItems.length)
     
     if (newsItems.length === 0) {
       return Response.json({ 
@@ -344,10 +522,8 @@ export async function POST(req: NextRequest) {
       })
     }
 
-    console.log('[v0] Calling Claude Haiku...')
     // Generate blog post from real news
     const blogPost = await generateBlogPost(newsItems)
-    console.log('[v0] Blog post generated:', blogPost.title)
     const slug = generateSlug(blogPost.title)
 
     // Save to database
@@ -361,6 +537,9 @@ export async function POST(req: NextRequest) {
         excerpt: blogPost.excerpt,
         category: blogPost.category,
         tags: blogPost.tags,
+        imageUrl: blogPost.imageUrl,
+        imageCredit: blogPost.imageCredit,
+        hasEmbeds: !!(blogPost.embeds.twitter?.length || blogPost.embeds.soundcloud?.length || blogPost.embeds.spotify?.length),
         url: `/blog/${slug}`
       },
       news_sources_used: [...new Set(newsItems.map(n => n.source))],
