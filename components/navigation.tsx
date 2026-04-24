@@ -24,7 +24,7 @@ export function Navigation() {
   }
 
   return (
-    <nav className="sticky top-0 z-50 w-full border-b border-purple-900/30 bg-black/95 backdrop-blur supports-[backdrop-filter]:bg-black/80">
+    <nav className="sticky top-0 z-50 w-full border-b border-blue-900/30 bg-black/95 backdrop-blur supports-[backdrop-filter]:bg-black/80">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between h-16">
           {/* Logo */}
@@ -55,7 +55,7 @@ export function Navigation() {
                   className={cn(
                     "px-4 py-2 rounded-lg text-sm font-medium transition-colors",
                     isActive
-                      ? "bg-purple-600/20 text-purple-400"
+                      ? "bg-red-600/20 text-red-400"
                       : "text-zinc-400 hover:text-white hover:bg-white/5"
                   )}
                 >
@@ -92,7 +92,7 @@ export function Navigation() {
 
         {/* Mobile Navigation */}
         {mobileMenuOpen && (
-          <div className="md:hidden py-4 border-t border-purple-900/30">
+          <div className="md:hidden py-4 border-t border-blue-900/30">
             <div className="flex flex-col gap-1">
               {navLinks.map((link) => {
                 const isActive = pathname === link.href || 
@@ -106,7 +106,7 @@ export function Navigation() {
                     className={cn(
                       "px-4 py-3 rounded-lg text-sm font-medium transition-colors",
                       isActive
-                        ? "bg-purple-600/20 text-purple-400"
+                        ? "bg-red-600/20 text-red-400"
                         : "text-zinc-400 hover:text-white hover:bg-white/5"
                     )}
                   >

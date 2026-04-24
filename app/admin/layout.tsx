@@ -57,7 +57,7 @@ export default function AdminLayout({
   return (
     <div className="min-h-screen bg-background">
       {/* Top Admin Navigation Bar */}
-      <header className="sticky top-0 z-50 border-b border-purple-900/30 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+      <header className="sticky top-0 z-50 border-b border-blue-900/30 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
         <div className="max-w-7xl mx-auto px-4 sm:px-6">
           <div className="flex items-center justify-between h-14">
             {/* Left: Back to site + Title */}
@@ -69,8 +69,8 @@ export default function AdminLayout({
                 <Home className="w-4 h-4" />
                 <span className="text-sm font-medium hidden sm:inline">Back to Site</span>
               </Link>
-              <div className="h-4 w-px bg-purple-900/30" />
-              <h1 className="text-sm font-bold text-purple-400">WCR Admin</h1>
+              <div className="h-4 w-px bg-blue-900/30" />
+              <h1 className="text-sm font-bold text-red-400">WCR Admin</h1>
             </div>
             
             {/* Center: Navigation Tabs */}
@@ -87,7 +87,7 @@ export default function AdminLayout({
                     className={cn(
                       "flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all",
                       isActive 
-                        ? "bg-purple-500/20 text-purple-300" 
+                        ? "bg-red-500/20 text-red-300" 
                         : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
                     )}
                   >
@@ -110,7 +110,7 @@ export default function AdminLayout({
         </div>
         
         {/* Mobile Navigation */}
-        <div className="md:hidden border-t border-purple-900/20 px-4 py-2">
+        <div className="md:hidden border-t border-blue-900/20 px-4 py-2">
           <nav className="flex items-center gap-2 overflow-x-auto">
             {adminNavItems.map((item) => {
               const Icon = item.icon
@@ -124,7 +124,7 @@ export default function AdminLayout({
                   className={cn(
                     "flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-medium whitespace-nowrap transition-all",
                     isActive 
-                      ? "bg-purple-500/20 text-purple-300" 
+                      ? "bg-red-500/20 text-red-300" 
                       : "text-muted-foreground hover:text-foreground"
                   )}
                 >

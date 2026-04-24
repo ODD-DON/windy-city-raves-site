@@ -1,20 +1,30 @@
-import { createClient } from '@/lib/supabase/server'
+import { cookies } from 'next/headers'
 import { AdminDashboard } from '@/components/admin-applicants/admin-dashboard'
-import type { Application, ApplicationStatus, ApplicantType } from '@/lib/types'
+import type { Application } from '@/lib/types'
 
 export const dynamic = 'force-dynamic'
 
+const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!
+const SUPABASE_ANON_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+
 export default async function ApplicantsPage() {
-  const supabase = await createClient()
+  const cookieStore = await cookies()
+  const accessToken = cookieStore.get("sb-access-token")?.value
 
   // Fetch all applications
-  const { data: applications, error } = await supabase
-    .from('wcr_jobs_applications')
-    .select('*')
-    .order('created_at', { ascending: false })
+  const res = await fetch(
+    `${SUPABASE_URL}/rest/v1/wcr_jobs_applications?select=*&order=created_at.desc`,
+    {
+      headers: {
+        "apikey": SUPABASE_ANON_KEY,
+        "Authorization": `Bearer ${accessToken}`,
+      },
+      cache: 'no-store'
+    }
+  )
 
-  if (error) {
-    console.error('Error fetching applications:', error)
+  if (!res.ok) {
+    console.error('Error fetching applications:', res.status)
     return (
       <div className="max-w-7xl mx-auto px-4 py-8">
         <div className="bg-red-500/10 border border-red-500/20 rounded-xl p-6 text-center">
@@ -24,6 +34,7 @@ export default async function ApplicantsPage() {
     )
   }
 
+  const applications = await res.json()
   const apps = (applications ?? []) as Application[]
 
   // Calculate stats

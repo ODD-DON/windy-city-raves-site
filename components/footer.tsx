@@ -6,7 +6,7 @@ import { Instagram, Music } from "lucide-react"
 
 export function Footer() {
   return (
-    <footer className="py-12 border-t border-purple-900/30 overflow-x-clip w-full max-w-full">
+    <footer className="py-12 border-t border-blue-900/30 overflow-x-clip w-full max-w-full">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex flex-col md:flex-row items-center justify-between gap-6">
           {/* Logo */}

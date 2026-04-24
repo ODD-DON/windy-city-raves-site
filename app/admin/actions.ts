@@ -1,25 +1,51 @@
 'use server'
 
-import { createClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
+import { cookies } from 'next/headers'
+
+const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!
+const SUPABASE_ANON_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+
+async function getAuthHeaders() {
+  const cookieStore = await cookies()
+  const accessToken = cookieStore.get("sb-access-token")?.value
+  return {
+    "apikey": SUPABASE_ANON_KEY,
+    "Authorization": `Bearer ${accessToken}`,
+    "Content-Type": "application/json",
+    "Prefer": "return=minimal"
+  }
+}
 
 export async function deleteApplication(id: string) {
-  const supabase = await createClient()
+  const headers = await getAuthHeaders()
 
   // Delete related profile data first (due to foreign key constraints)
-  await supabase.from('wcr_jobs_dj_profiles').delete().eq('application_id', id)
-  await supabase.from('wcr_jobs_photo_profiles').delete().eq('application_id', id)
-  await supabase.from('wcr_jobs_performer_profiles').delete().eq('application_id', id)
-  await supabase.from('wcr_jobs_notes').delete().eq('application_id', id)
+  await fetch(`${SUPABASE_URL}/rest/v1/wcr_jobs_dj_profiles?application_id=eq.${id}`, {
+    method: 'DELETE',
+    headers
+  })
+  await fetch(`${SUPABASE_URL}/rest/v1/wcr_jobs_photo_profiles?application_id=eq.${id}`, {
+    method: 'DELETE',
+    headers
+  })
+  await fetch(`${SUPABASE_URL}/rest/v1/wcr_jobs_performer_profiles?application_id=eq.${id}`, {
+    method: 'DELETE',
+    headers
+  })
+  await fetch(`${SUPABASE_URL}/rest/v1/wcr_jobs_notes?application_id=eq.${id}`, {
+    method: 'DELETE',
+    headers
+  })
 
   // Delete the application
-  const { error } = await supabase
-    .from('wcr_jobs_applications')
-    .delete()
-    .eq('id', id)
+  const res = await fetch(`${SUPABASE_URL}/rest/v1/wcr_jobs_applications?id=eq.${id}`, {
+    method: 'DELETE',
+    headers
+  })
 
-  if (error) {
-    console.error('Error deleting application:', error)
+  if (!res.ok) {
+    console.error('Error deleting application')
     throw new Error('Failed to delete application')
   }
 
@@ -27,15 +53,16 @@ export async function deleteApplication(id: string) {
 }
 
 export async function updateApplicationStatus(id: string, status: string) {
-  const supabase = await createClient()
+  const headers = await getAuthHeaders()
 
-  const { error } = await supabase
-    .from('wcr_jobs_applications')
-    .update({ status, updated_at: new Date().toISOString() })
-    .eq('id', id)
+  const res = await fetch(`${SUPABASE_URL}/rest/v1/wcr_jobs_applications?id=eq.${id}`, {
+    method: 'PATCH',
+    headers,
+    body: JSON.stringify({ status, updated_at: new Date().toISOString() })
+  })
 
-  if (error) {
-    console.error('Error updating application status:', error)
+  if (!res.ok) {
+    console.error('Error updating application status')
     throw new Error('Failed to update status')
   }
 
@@ -44,15 +71,16 @@ export async function updateApplicationStatus(id: string, status: string) {
 }
 
 export async function updateApplicationRating(id: string, rating: number) {
-  const supabase = await createClient()
+  const headers = await getAuthHeaders()
 
-  const { error } = await supabase
-    .from('wcr_jobs_applications')
-    .update({ internal_rating: rating, updated_at: new Date().toISOString() })
-    .eq('id', id)
+  const res = await fetch(`${SUPABASE_URL}/rest/v1/wcr_jobs_applications?id=eq.${id}`, {
+    method: 'PATCH',
+    headers,
+    body: JSON.stringify({ internal_rating: rating, updated_at: new Date().toISOString() })
+  })
 
-  if (error) {
-    console.error('Error updating rating:', error)
+  if (!res.ok) {
+    console.error('Error updating rating')
     throw new Error('Failed to update rating')
   }
 
@@ -61,15 +89,16 @@ export async function updateApplicationRating(id: string, rating: number) {
 }
 
 export async function toggleFavorite(id: string, isFavorite: boolean) {
-  const supabase = await createClient()
+  const headers = await getAuthHeaders()
 
-  const { error } = await supabase
-    .from('wcr_jobs_applications')
-    .update({ is_favorite: isFavorite, updated_at: new Date().toISOString() })
-    .eq('id', id)
+  const res = await fetch(`${SUPABASE_URL}/rest/v1/wcr_jobs_applications?id=eq.${id}`, {
+    method: 'PATCH',
+    headers,
+    body: JSON.stringify({ is_favorite: isFavorite, updated_at: new Date().toISOString() })
+  })
 
-  if (error) {
-    console.error('Error toggling favorite:', error)
+  if (!res.ok) {
+    console.error('Error toggling favorite')
     throw new Error('Failed to update favorite')
   }
 
@@ -78,18 +107,20 @@ export async function toggleFavorite(id: string, isFavorite: boolean) {
 }
 
 export async function addNote(applicationId: string, content: string, authorName: string = 'Admin') {
-  const supabase = await createClient()
+  const headers = await getAuthHeaders()
 
-  const { error } = await supabase
-    .from('wcr_jobs_notes')
-    .insert({
+  const res = await fetch(`${SUPABASE_URL}/rest/v1/wcr_jobs_notes`, {
+    method: 'POST',
+    headers,
+    body: JSON.stringify({
       application_id: applicationId,
       content,
       author_name: authorName,
     })
+  })
 
-  if (error) {
-    console.error('Error adding note:', error)
+  if (!res.ok) {
+    console.error('Error adding note')
     throw new Error('Failed to add note')
   }
 
