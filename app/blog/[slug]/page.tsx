@@ -236,7 +236,18 @@ export default async function BlogPostPage({ params }: { params: Promise<{ slug:
           {/* Content */}
           <div className="max-w-4xl mx-auto px-4 py-12">
             <div 
-              className="prose prose-lg prose-gray max-w-none prose-headings:font-bold prose-a:text-red-500 prose-a:no-underline hover:prose-a:underline"
+              className="prose prose-lg prose-gray max-w-none 
+                prose-headings:font-bold prose-headings:text-gray-900
+                prose-h2:text-2xl prose-h2:mt-10 prose-h2:mb-4
+                prose-p:mb-6 prose-p:leading-relaxed
+                prose-strong:text-gray-900 prose-strong:font-semibold
+                prose-em:text-gray-700
+                prose-blockquote:border-l-4 prose-blockquote:border-red-500 prose-blockquote:bg-gray-50 prose-blockquote:py-4 prose-blockquote:px-6 prose-blockquote:italic prose-blockquote:text-gray-700 prose-blockquote:not-italic prose-blockquote:font-medium
+                prose-a:text-red-500 prose-a:no-underline hover:prose-a:underline
+                [&_.embed-container]:my-8 [&_.embed-container]:rounded-xl [&_.embed-container]:overflow-hidden
+                [&_.twitter-embed]:bg-gray-50 [&_.twitter-embed]:p-4
+                [&_.spotify-embed]:bg-gray-900 [&_.spotify-embed]:p-4
+                [&_.soundcloud-embed]:bg-orange-50 [&_.soundcloud-embed]:p-4"
               dangerouslySetInnerHTML={{ __html: post.content }}
             />
             

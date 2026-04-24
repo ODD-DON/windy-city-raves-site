@@ -31,10 +31,14 @@ interface RSSItem {
 
 // Check if image URL is valid
 async function isImageValid(url: string): Promise<boolean> {
+  if (!url || url.length < 10) return false
   try {
-    const response = await fetch(url, { method: 'HEAD' })
+    const response = await fetch(url, { 
+      method: 'HEAD',
+      signal: AbortSignal.timeout(5000) // 5 second timeout
+    })
     const contentType = response.headers.get('content-type')
-    return response.ok && (contentType?.startsWith('image/') || false)
+    return response.ok && (contentType?.startsWith('image/') || url.includes('unsplash'))
   } catch {
     return false
   }
@@ -290,13 +294,26 @@ Respond ONLY with valid JSON (no markdown code blocks):
 {
   "title": "Catchy headline, no clickbait, 50-70 chars",
   "excerpt": "Hook for social sharing, 150-200 chars, make people want to click",
-  "content": "Full article in HTML with <p> tags. 4-6 short paragraphs. Connect to Chicago scene when possible. Sound like WCR voice.",
+  "content": "Full article in rich HTML. Use these tags:
+    - <p> for paragraphs (2-3 sentences each, with spacing)
+    - <h2> for section breaks (use 1-2 in longer posts)
+    - <strong> or <b> to emphasize key names, venues, dates
+    - <em> or <i> for track titles or album names
+    - <blockquote> for pull quotes or standout lines
+    Write 5-8 short paragraphs total. Connect to Chicago scene when relevant. Sound like WCR voice.",
   "metaTitle": "SEO title with artist name + Chicago EDM, 50-60 chars",
   "metaDescription": "SEO description, 150-160 chars",
   "keywords": ["8-10", "seo", "keywords", "artist-names", "chicago-edm"],
   "category": "scene-news or artist-spotlight or festival-news or industry-news",
   "tags": ["relevant", "tags", "genres", "artist-names"]
 }
+
+FORMATTING RULES:
+- Every paragraph needs its own <p> tag
+- Bold artist names, venue names, and dates with <strong>
+- Italicize track/album titles with <em>
+- Add a <h2> to break up longer posts
+- Use <blockquote> for memorable quotes or standout lines
 
 Remember: Write about REAL news from above. Short paragraphs. Chicago voice. No em dashes. No AI filler.`,
     maxOutputTokens: 2000,
@@ -312,23 +329,25 @@ Remember: Write about REAL news from above. Short paragraphs. Chicago voice. No 
     const embeds = detectEmbeds(mainNewsItem.rawContent || mainNewsItem.description, mainNewsItem.title)
     
     // Find a valid image or use Unsplash fallback
-    let finalImageUrl: string | undefined
-    let imageCredit: string | undefined
+    let finalImageUrl: string
+    let imageCredit: string
+    let foundValidImage = false
     
     // Try to find a valid image from news items
     for (const item of newsItems) {
-      if (item.imageUrl) {
+      if (item.imageUrl && item.imageUrl.startsWith('http')) {
         const isValid = await isImageValid(item.imageUrl)
         if (isValid) {
           finalImageUrl = item.imageUrl
           imageCredit = item.source
+          foundValidImage = true
           break
         }
       }
     }
     
-    // Fallback to Unsplash if no valid image found
-    if (!finalImageUrl) {
+    // Always fallback to Unsplash if no valid image found
+    if (!foundValidImage) {
       finalImageUrl = getUnsplashFallback(parsed.title)
       imageCredit = 'Unsplash'
     }
