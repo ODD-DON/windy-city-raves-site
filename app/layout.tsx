@@ -216,7 +216,7 @@ export default function RootLayout({
   children: React.ReactNode
 }>) {
   return (
-    <html lang="en" className="dark w-full max-w-full bg-background" data-scroll-behavior="smooth">
+    <html lang="en" className="w-full max-w-full bg-background" data-scroll-behavior="smooth">
       <head>
         <script
           type="application/ld+json"

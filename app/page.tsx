@@ -1,60 +1,35 @@
 import Link from "next/link"
 import Image from "next/image"
-import { Calendar, Megaphone, Users, MapPin, ArrowRight, Sparkles } from "lucide-react"
+import { Calendar, ArrowRight, Eye, Users, BarChart3, UserPlus } from "lucide-react"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent } from "@/components/ui/card"
 import { Footer } from "@/components/footer"
 
-const features = [
-  {
-    icon: Calendar,
-    title: "Events Calendar",
-    description: "Browse upcoming raves, festivals, and electronic music events near you.",
-    href: "/events",
-    cta: "View Events",
-    gradient: "from-red-500/20 to-blue-500/20",
-    iconColor: "text-red-400",
-  },
-  {
-    icon: Megaphone,
-    title: "Promote Your Event",
-    description: "Get your event in front of thousands of rave fans with our promotion packages.",
-    href: "/promote",
-    cta: "Promote Now",
-    gradient: "from-blue-500/20 to-red-500/20",
-    iconColor: "text-blue-400",
-  },
-  {
-    icon: Users,
-    title: "Join the Talent Roster",
-    description: "Apply as a DJ, photographer, videographer, or performer to work WCR events.",
-    href: "/apply",
-    cta: "Apply Today",
-    gradient: "from-red-500/20 to-blue-500/20",
-    iconColor: "text-red-400",
-  },
+const stats = [
+  { value: "19.5K", label: "Followers", change: "+12%", icon: Users, color: "text-red-500" },
+  { value: "304K", label: "Views", change: "+34%", icon: Eye, color: "text-cyan-500" },
+  { value: "116K", label: "Reached", change: "+28%", icon: BarChart3, color: "text-red-500" },
+  { value: "59%", label: "Non-Followers", change: "+8%", icon: UserPlus, color: "text-cyan-500" },
 ]
 
-const stats = [
-  { value: "19.5K+", label: "Followers" },
-  { value: "300K+", label: "Monthly Reach" },
-  { value: "500+", label: "Events Listed" },
+const audienceTags = [
+  "DJs and Collectives",
+  "Clubs and Venues", 
+  "Event Promoters",
+  "Festivals"
 ]
 
 export default function HomePage() {
   return (
-    <div className="min-h-screen bg-background flex flex-col">
-      {/* Hero */}
-      <section className="relative flex flex-col items-center justify-center text-center px-4 py-24 md:py-32 overflow-hidden">
-        {/* Background gradients */}
-        <div className="absolute inset-0 bg-gradient-to-br from-blue-950/80 via-background to-red-950/40 -z-10" />
-        <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-blue-600/20 via-transparent to-transparent -z-10" />
-        <div className="absolute top-1/4 -left-32 w-64 h-64 bg-red-600/30 rounded-full blur-3xl -z-10" />
-        <div className="absolute bottom-1/4 -right-32 w-64 h-64 bg-blue-600/20 rounded-full blur-3xl -z-10" />
-
+    <div className="min-h-screen bg-white flex flex-col">
+      {/* Hero Section */}
+      <section className="relative flex flex-col items-center justify-center text-center px-4 pt-16 pb-20 overflow-hidden">
+        {/* Subtle gradient background */}
+        <div className="absolute inset-0 bg-gradient-to-b from-red-50/50 via-white to-cyan-50/30 -z-10" />
+        <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-red-500 via-cyan-500 to-red-500" />
+        
         {/* Logo */}
-        <div className="mb-6 animate-in fade-in slide-in-from-bottom-4 duration-700">
-          <div className="relative w-[180px] md:w-[240px] h-[77px] md:h-[103px]">
+        <div className="mb-8">
+          <div className="relative w-[200px] md:w-[280px] h-[80px] md:h-[110px]">
             <Image
               src="https://hebbkx1anhila5yf.public.blob.vercel-storage.com/New%20Logo-tGlIj5rYBWQGemKw5Ce0TbbPJg5oJJ.png"
               alt="Windy City Raves"
@@ -65,110 +40,175 @@ export default function HomePage() {
           </div>
         </div>
 
-        {/* Badge */}
-        <div className="flex items-center gap-2 mb-6 animate-in fade-in slide-in-from-bottom-4 duration-700 delay-100">
-          <div className="inline-flex items-center gap-2 bg-red-500/10 border border-red-500/20 rounded-full px-4 py-1.5">
-            <Sparkles className="w-4 h-4 text-red-400" />
-            <span className="text-red-300 font-medium text-sm">
-              Chicago&apos;s Premier EDM Community
-            </span>
-          </div>
-        </div>
-
-        <h1 className="text-4xl sm:text-5xl md:text-7xl font-black text-white mb-6 leading-tight animate-in fade-in slide-in-from-bottom-4 duration-700 delay-150 text-balance">
-          {"Your Home for "}
-          <span className="bg-gradient-to-r from-red-400 via-blue-400 to-red-400 bg-clip-text text-transparent">
-            Electronic Music
-          </span>
+        {/* Main Headline */}
+        <h1 className="text-3xl sm:text-4xl md:text-5xl font-bold text-gray-900 mb-3 leading-tight text-balance max-w-3xl">
+          Get Your Event Seen by
         </h1>
+        <h2 className="text-3xl sm:text-4xl md:text-5xl font-bold mb-6 leading-tight text-balance max-w-3xl">
+          <span className="text-cyan-500">Thousands of Chicago Ravers</span>
+        </h2>
 
-        <p className="text-lg md:text-xl text-zinc-300 max-w-2xl mb-10 animate-in fade-in slide-in-from-bottom-4 duration-700 delay-200 text-pretty">
-          Discover events, promote your shows, and connect with the Chicago rave community — all in one place.
+        {/* Subtitle */}
+        <p className="text-gray-600 text-lg max-w-2xl mb-8">
+          High-visibility posts, stories, and giveaways for DJs, venues, and festivals.
         </p>
 
-        <div className="flex flex-wrap gap-4 justify-center animate-in fade-in slide-in-from-bottom-4 duration-700 delay-300">
-          <Button size="lg" asChild className="bg-red-600 hover:bg-red-500 text-white font-semibold px-6 py-6 text-base">
-            <Link href="/events">
-              <Calendar className="mr-2 h-5 w-5" />
-              Browse Events
+        {/* Audience Tags */}
+        <div className="flex flex-wrap justify-center gap-2 mb-8">
+          {audienceTags.map((tag) => (
+            <span 
+              key={tag}
+              className="px-4 py-2 bg-gray-100 text-gray-700 text-sm font-medium rounded-full"
+            >
+              {tag}
+            </span>
+          ))}
+        </div>
+
+        {/* CTA Buttons */}
+        <div className="flex flex-wrap gap-4 justify-center mb-12">
+          <Button size="lg" asChild className="bg-red-500 hover:bg-red-600 text-white font-semibold px-6 rounded-full">
+            <Link href="/promote">
+              Promote My Event
+              <ArrowRight className="ml-2 h-4 w-4" />
             </Link>
           </Button>
-          <Button size="lg" variant="outline" asChild className="border-blue-500/50 text-white hover:bg-blue-500/10 hover:border-blue-400 font-semibold px-6 py-6 text-base">
-            <Link href="/apply">
-              <Users className="mr-2 h-5 w-5" />
-              Join the Team
+          <Button size="lg" variant="outline" asChild className="border-gray-300 text-gray-700 hover:bg-gray-50 font-semibold px-6 rounded-full">
+            <Link href="/promote#packages">
+              View Packages
             </Link>
           </Button>
         </div>
 
-        <div className="flex items-center gap-2 mt-10 text-zinc-500 text-sm animate-in fade-in duration-700 delay-500">
-          <MapPin className="h-4 w-4" />
-          <span>Chicago, IL — and expanding to more cities</span>
-        </div>
-      </section>
-
-      {/* Stats bar */}
-      <section className="border-y border-blue-900/30 bg-blue-950/30 py-8">
-        <div className="max-w-5xl mx-auto px-4">
-          <div className="grid grid-cols-3 gap-8">
+        {/* Stats Section */}
+        <div className="w-full max-w-3xl">
+          <div className="inline-flex items-center gap-2 bg-gray-100 rounded-full px-4 py-1.5 mb-6">
+            <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse" />
+            <span className="text-gray-600 text-sm font-medium">LAST 30 DAYS</span>
+          </div>
+          
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
             {stats.map((stat) => (
-              <div key={stat.label} className="text-center">
-                <div className="text-2xl md:text-3xl font-bold text-white mb-1">{stat.value}</div>
-                <div className="text-sm text-zinc-400">{stat.label}</div>
+              <div 
+                key={stat.label}
+                className="bg-white border border-gray-100 rounded-xl p-4 shadow-sm"
+              >
+                <div className="flex items-center justify-center gap-2 mb-2">
+                  <stat.icon className={`w-4 h-4 ${stat.color}`} />
+                  <span className="text-xs text-green-500 font-medium">{stat.change}</span>
+                </div>
+                <div className={`text-2xl md:text-3xl font-bold ${stat.color}`}>
+                  {stat.value}
+                </div>
+                <div className="text-gray-500 text-sm">{stat.label}</div>
               </div>
             ))}
           </div>
         </div>
       </section>
 
-      {/* Feature cards */}
-      <section className="px-4 py-20 max-w-5xl mx-auto w-full">
-        <div className="text-center mb-12">
-          <h2 className="text-3xl md:text-4xl font-bold text-white mb-4">Everything You Need</h2>
-          <p className="text-zinc-400 max-w-xl mx-auto">
-            Whether you&apos;re looking for events, promoting shows, or joining our talent roster — we&apos;ve got you covered.
+      {/* Why WCR Section */}
+      <section className="px-4 py-16 bg-white">
+        <div className="max-w-5xl mx-auto">
+          <h2 className="text-2xl md:text-3xl font-bold text-gray-900 text-center mb-4">
+            Why Windy City Raves?
+          </h2>
+          <p className="text-gray-600 text-center mb-12 max-w-2xl mx-auto">
+            Connecting Chicago&apos;s EDM community with events they want to see.
           </p>
-        </div>
-        <div className="grid md:grid-cols-3 gap-6">
-          {features.map((f) => (
-            <Card
-              key={f.href}
-              className="group bg-zinc-900/50 border-blue-900/30 hover:border-red-500/50 transition-all duration-300 hover:shadow-lg hover:shadow-red-500/10"
-            >
-              <CardContent className="p-6 flex flex-col gap-4">
-                <div className={`w-14 h-14 rounded-xl bg-gradient-to-br ${f.gradient} flex items-center justify-center group-hover:scale-110 transition-transform duration-300`}>
-                  <f.icon className={`h-7 w-7 ${f.iconColor}`} />
+
+          <div className="grid md:grid-cols-4 gap-6">
+            {[
+              { icon: "📍", label: "Chicago", sublabel: "Focused", title: "Local Audience", desc: "Chicago-based EDM audience already looking for events and nightlife." },
+              { icon: "👁", label: "59%", sublabel: "Non-Followers", title: "New People, Not Just Followers", desc: "Your event reaches people who don't already follow us - real discovery, not just recycled audience." },
+              { icon: "📈", label: "15.8M", sublabel: "Top 3 Posts", title: "High Visibility", desc: "Top content regularly reaches tens of thousands of viewers." },
+              { icon: "📅", label: "Weekly", sublabel: "Roundups", title: "Event Focused", desc: "Content structured for event promotion - giveaways, roundups, features." },
+            ].map((item, i) => (
+              <div key={i} className="bg-white border border-gray-100 rounded-xl p-5 hover:shadow-md transition-shadow">
+                <div className="flex items-center gap-3 mb-3">
+                  <span className="text-2xl">{item.icon}</span>
+                  <div>
+                    <span className="font-bold text-gray-900">{item.label}</span>
+                    <span className="text-gray-500 text-sm ml-1">{item.sublabel}</span>
+                  </div>
                 </div>
-                <h3 className="text-xl font-semibold text-white">{f.title}</h3>
-                <p className="text-zinc-400 text-sm flex-1">{f.description}</p>
-                <Button variant="ghost" size="sm" asChild className="w-fit text-red-400 hover:text-red-300 hover:bg-red-500/10 px-0 group/btn">
-                  <Link href={f.href} className="flex items-center gap-2">
-                    {f.cta}
-                    <ArrowRight className="w-4 h-4 group-hover/btn:translate-x-1 transition-transform" />
-                  </Link>
-                </Button>
-              </CardContent>
-            </Card>
-          ))}
+                <h3 className="font-semibold text-gray-900 mb-2">{item.title}</h3>
+                <p className="text-gray-500 text-sm">{item.desc}</p>
+              </div>
+            ))}
+          </div>
         </div>
       </section>
 
-      {/* CTA Section */}
-      <section className="px-4 py-16 bg-gradient-to-b from-blue-950/50 to-background">
-        <div className="max-w-3xl mx-auto text-center">
-          <h2 className="text-2xl md:text-3xl font-bold text-white mb-4">
-            Ready to Promote Your Event?
+      {/* Performance Section */}
+      <section className="px-4 py-16 bg-gray-50">
+        <div className="max-w-5xl mx-auto text-center">
+          <span className="text-red-500 font-semibold text-sm tracking-wide">PERFORMANCE</span>
+          <h2 className="text-2xl md:text-3xl font-bold text-gray-900 mt-2 mb-4">
+            Real Results, Real Reach
           </h2>
-          <p className="text-zinc-400 mb-8 text-pretty">
-            Get your event in front of thousands of dedicated electronic music fans in Chicago. 
-            Our promotion packages are designed to maximize your reach and ticket sales.
+          
+          <div className="inline-flex items-center gap-2 bg-white rounded-full px-4 py-1.5 mb-6 shadow-sm">
+            <span className="w-2 h-2 bg-green-500 rounded-full" />
+            <span className="text-gray-600 text-sm font-medium">LAST 30 DAYS</span>
+          </div>
+
+          <p className="text-gray-600 max-w-2xl mx-auto mb-10">
+            Windy City Raves is more than a social page — it is a discovery platform for Chicago EDM events. 
+            Our strongest content consistently drives awareness, profile traffic, and direct audience action.
           </p>
-          <Button size="lg" asChild className="bg-red-600 hover:bg-red-500 text-white font-semibold">
-            <Link href="/promote">
-              <Megaphone className="mr-2 h-5 w-5" />
-              View Promotion Packages
+
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
+            {[
+              { icon: Eye, value: "304,247", label: "Monthly Views" },
+              { icon: Users, value: "116,121", label: "Accounts Reached" },
+              { icon: BarChart3, value: "24,870", label: "Interactions" },
+              { icon: UserPlus, value: "4,504", label: "Profile Visits" },
+            ].map((stat) => (
+              <div key={stat.label} className="bg-white border border-gray-100 rounded-xl p-6 shadow-sm">
+                <stat.icon className="w-6 h-6 text-cyan-500 mx-auto mb-3" />
+                <div className="text-2xl md:text-3xl font-bold text-gray-900 mb-1">
+                  {stat.value}
+                </div>
+                <div className="text-gray-500 text-sm">{stat.label}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* Quick Links Section */}
+      <section className="px-4 py-16 bg-white">
+        <div className="max-w-4xl mx-auto">
+          <div className="grid md:grid-cols-2 gap-6">
+            <Link 
+              href="/events"
+              className="group bg-gradient-to-br from-red-50 to-red-100/50 border border-red-100 rounded-2xl p-8 hover:shadow-lg transition-all"
+            >
+              <Calendar className="w-10 h-10 text-red-500 mb-4" />
+              <h3 className="text-xl font-bold text-gray-900 mb-2">Browse Events</h3>
+              <p className="text-gray-600 mb-4">
+                Find raves, concerts, and festivals happening in Chicago tonight and this weekend.
+              </p>
+              <span className="text-red-500 font-semibold flex items-center gap-2 group-hover:gap-3 transition-all">
+                View Calendar <ArrowRight className="w-4 h-4" />
+              </span>
             </Link>
-          </Button>
+
+            <Link 
+              href="/apply"
+              className="group bg-gradient-to-br from-cyan-50 to-cyan-100/50 border border-cyan-100 rounded-2xl p-8 hover:shadow-lg transition-all"
+            >
+              <Users className="w-10 h-10 text-cyan-500 mb-4" />
+              <h3 className="text-xl font-bold text-gray-900 mb-2">Join the Team</h3>
+              <p className="text-gray-600 mb-4">
+                Apply as a DJ, photographer, videographer, or performer to work WCR events.
+              </p>
+              <span className="text-cyan-500 font-semibold flex items-center gap-2 group-hover:gap-3 transition-all">
+                Apply Now <ArrowRight className="w-4 h-4" />
+              </span>
+            </Link>
+          </div>
         </div>
       </section>
 

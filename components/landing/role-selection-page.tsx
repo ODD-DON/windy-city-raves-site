@@ -10,53 +10,53 @@ const ROLES = [
     icon: Disc3,
     label: 'DJ',
     description: 'Spin sets at Chicago raves & club nights',
-    iconBg: 'bg-purple-500/20 group-hover:bg-purple-500',
-    iconColor: 'text-purple-400 group-hover:text-white',
-    tileBorder: 'hover:border-purple-500/50',
-    tileBg: 'hover:bg-purple-500/5',
+    iconBg: 'bg-red-50 group-hover:bg-red-500',
+    iconColor: 'text-red-500 group-hover:text-white',
+    tileBorder: 'hover:border-red-200',
+    tileBg: 'hover:bg-red-50/50',
   },
   {
     href: '/apply/photo_video',
     icon: Camera,
     label: 'Photo / Video',
     description: 'Capture the energy of our events',
-    iconBg: 'bg-cyan-500/20 group-hover:bg-cyan-500',
-    iconColor: 'text-cyan-400 group-hover:text-white',
-    tileBorder: 'hover:border-cyan-500/50',
-    tileBg: 'hover:bg-cyan-500/5',
+    iconBg: 'bg-cyan-50 group-hover:bg-cyan-500',
+    iconColor: 'text-cyan-500 group-hover:text-white',
+    tileBorder: 'hover:border-cyan-200',
+    tileBg: 'hover:bg-cyan-50/50',
   },
   {
     href: '/apply/performer',
     icon: Sparkles,
     label: 'Performer',
     description: 'Dancers, flow artists, aerialists & more',
-    iconBg: 'bg-pink-500/20 group-hover:bg-pink-500',
-    iconColor: 'text-pink-400 group-hover:text-white',
-    tileBorder: 'hover:border-pink-500/50',
-    tileBg: 'hover:bg-pink-500/5',
+    iconBg: 'bg-red-50 group-hover:bg-red-500',
+    iconColor: 'text-red-500 group-hover:text-white',
+    tileBorder: 'hover:border-red-200',
+    tileBg: 'hover:bg-red-50/50',
   },
 ]
 
 export function RoleSelectionPage() {
   return (
-    <div className="min-h-screen bg-background flex flex-col">
+    <div className="min-h-screen bg-white flex flex-col">
       <div className="max-w-3xl mx-auto w-full px-5 pt-12 pb-6 text-center">
-        <div className="inline-flex items-center gap-2 bg-purple-500/10 border border-purple-500/20 rounded-full px-4 py-1.5 mb-6">
-          <span className="w-2 h-2 rounded-full bg-purple-500 animate-pulse" />
-          <span className="text-xs font-semibold text-purple-400 uppercase tracking-widest">
+        <div className="inline-flex items-center gap-2 bg-red-50 border border-red-100 rounded-full px-4 py-1.5 mb-6">
+          <span className="w-2 h-2 rounded-full bg-red-500 animate-pulse" />
+          <span className="text-xs font-semibold text-red-500 uppercase tracking-widest">
             Now Accepting Applications
           </span>
         </div>
-        <h1 className="font-display text-3xl md:text-4xl font-bold text-white leading-tight text-balance">
+        <h1 className="font-display text-3xl md:text-4xl font-bold text-gray-900 leading-tight text-balance">
           Join the WCR Talent Roster
         </h1>
-        <p className="mt-3 text-zinc-400 text-base leading-relaxed max-w-md mx-auto text-pretty">
+        <p className="mt-3 text-gray-600 text-base leading-relaxed max-w-md mx-auto text-pretty">
           {"Chicago's premier rave and nightlife events are looking for talented people. Select your role to get started."}
         </p>
       </div>
 
       <main className="flex-1 max-w-3xl mx-auto w-full px-5 pb-16">
-        <p className="text-xs font-semibold uppercase tracking-widest text-zinc-500 mb-5 text-center">
+        <p className="text-xs font-semibold uppercase tracking-widest text-gray-400 mb-5 text-center">
           I am applying as a...
         </p>
 
@@ -67,16 +67,16 @@ export function RoleSelectionPage() {
               <Link
                 key={role.href}
                 href={role.href}
-                className={`group relative flex flex-col items-center gap-4 rounded-2xl border-2 border-zinc-800 bg-zinc-900/50 px-4 py-8 text-center transition-all duration-200 hover:shadow-lg hover:shadow-purple-500/10 active:scale-[0.97] ${role.tileBorder} ${role.tileBg}`}
+                className={`group relative flex flex-col items-center gap-4 rounded-2xl border border-gray-200 bg-white px-4 py-8 text-center transition-all duration-200 hover:shadow-lg active:scale-[0.97] ${role.tileBorder} ${role.tileBg}`}
               >
                 <div className={`w-16 h-16 rounded-2xl flex items-center justify-center transition-all duration-200 shrink-0 ${role.iconBg}`}>
                   <Icon className={`w-8 h-8 transition-colors duration-200 ${role.iconColor}`} strokeWidth={1.5} />
                 </div>
                 <div className="w-full">
-                  <p className="font-display text-lg font-bold text-white leading-tight text-balance">{role.label}</p>
-                  <p className="mt-1.5 text-xs text-zinc-400 leading-snug text-pretty">{role.description}</p>
+                  <p className="font-display text-lg font-bold text-gray-900 leading-tight text-balance">{role.label}</p>
+                  <p className="mt-1.5 text-xs text-gray-500 leading-snug text-pretty">{role.description}</p>
                 </div>
-                <div className="flex items-center gap-1 text-xs font-semibold text-zinc-500 group-hover:text-purple-400 transition-colors">
+                <div className="flex items-center gap-1 text-xs font-semibold text-gray-400 group-hover:text-red-500 transition-colors">
                   Apply now <ArrowRight className="w-3.5 h-3.5" />
                 </div>
               </Link>
@@ -86,19 +86,19 @@ export function RoleSelectionPage() {
 
         <div className="flex items-center justify-center gap-8 mt-14 opacity-30">
           {[...Array(4)].map((_, i) => (
-            <svg key={i} viewBox="0 0 50 50" className="w-6 h-6 fill-purple-500" aria-hidden="true">
+            <svg key={i} viewBox="0 0 50 50" className="w-6 h-6 fill-red-500" aria-hidden="true">
               <polygon points="25,3 29,18 44,18 32,27 36,42 25,33 14,42 18,27 6,18 21,18" />
             </svg>
           ))}
         </div>
 
-        <p className="text-center text-xs text-zinc-500 mt-5 flex items-center justify-center gap-2">
+        <p className="text-center text-xs text-gray-400 mt-5 flex items-center justify-center gap-2">
           <span>Questions? DM</span>
           <a
             href="https://instagram.com/windycityraves"
             target="_blank"
             rel="noopener noreferrer"
-            className="inline-flex items-center gap-1 underline hover:text-zinc-300 transition-colors"
+            className="inline-flex items-center gap-1 underline hover:text-gray-600 transition-colors"
             aria-label="DM us on Instagram @windycityraves"
           >
             <svg viewBox="0 0 24 24" className="w-3.5 h-3.5 fill-current" aria-hidden="true">
