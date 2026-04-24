@@ -122,53 +122,50 @@ async function fetchFestiveOwlTweets(): Promise<Tweet[]> {
   }
   
   console.log(`[v0] Parsing RSS from ${successInstance}`)
-    const tweets: Tweet[] = []
+  
+  const tweets: Tweet[] = []
+  
+  // Parse RSS items
+  const itemMatches = xml.match(/<item>([\s\S]*?)<\/item>/g) || []
+  
+  for (const itemXml of itemMatches.slice(0, 10)) {
+    // Extract tweet ID from link
+    const link = itemXml.match(/<link>(.*?)<\/link>/)?.[1] || ''
+    const idMatch = link.match(/status\/(\d+)/)
+    const id = idMatch ? idMatch[1] : ''
     
-    // Parse RSS items
-    const itemMatches = xml.match(/<item>([\s\S]*?)<\/item>/g) || []
+    // Get tweet text from title or description
+    const title = itemXml.match(/<title><!\[CDATA\[(.*?)\]\]><\/title>/)?.[1] || 
+                  itemXml.match(/<title>(.*?)<\/title>/)?.[1] || ''
+    const description = itemXml.match(/<description><!\[CDATA\[([\s\S]*?)\]\]><\/description>/)?.[1] ||
+                        itemXml.match(/<description>([\s\S]*?)<\/description>/)?.[1] || ''
     
-    for (const itemXml of itemMatches.slice(0, 10)) {
-      // Extract tweet ID from link
-      const link = itemXml.match(/<link>(.*?)<\/link>/)?.[1] || ''
-      const idMatch = link.match(/status\/(\d+)/)
-      const id = idMatch ? idMatch[1] : ''
-      
-      // Get tweet text from title or description
-      const title = itemXml.match(/<title><!\[CDATA\[(.*?)\]\]><\/title>/)?.[1] || 
-                    itemXml.match(/<title>(.*?)<\/title>/)?.[1] || ''
-      const description = itemXml.match(/<description><!\[CDATA\[([\s\S]*?)\]\]><\/description>/)?.[1] ||
-                          itemXml.match(/<description>([\s\S]*?)<\/description>/)?.[1] || ''
-      
-      const pubDate = itemXml.match(/<pubDate>(.*?)<\/pubDate>/)?.[1] || ''
-      
-      // Extract image from enclosure or media tags
-      const imageUrl = itemXml.match(/<enclosure[^>]*url="([^"]+)"/)?.[1] ||
-                       itemXml.match(/<media:content[^>]*url="([^"]+)"/)?.[1] ||
-                       // Also check for images in description HTML
-                       description.match(/src="([^"]+\.(jpg|png|gif|webp))"/i)?.[1] ||
-                       undefined
-      
-      // Clean text - remove HTML, decode entities
-      const text = (description || title)
-        .replace(/<[^>]*>/g, ' ')
-        .replace(/&amp;/g, '&')
-        .replace(/&lt;/g, '<')
-        .replace(/&gt;/g, '>')
-        .replace(/&quot;/g, '"')
-        .replace(/&#39;/g, "'")
-        .replace(/\s+/g, ' ')
-        .trim()
-      
-      if (id && text.length > 20) {
-        tweets.push({ id, text, link, pubDate, imageUrl })
-      }
+    const pubDate = itemXml.match(/<pubDate>(.*?)<\/pubDate>/)?.[1] || ''
+    
+    // Extract image from enclosure or media tags
+    const imageUrl = itemXml.match(/<enclosure[^>]*url="([^"]+)"/)?.[1] ||
+                     itemXml.match(/<media:content[^>]*url="([^"]+)"/)?.[1] ||
+                     // Also check for images in description HTML
+                     description.match(/src="([^"]+\.(jpg|png|gif|webp))"/i)?.[1] ||
+                     undefined
+    
+    // Clean text - remove HTML, decode entities
+    const text = (description || title)
+      .replace(/<[^>]*>/g, ' ')
+      .replace(/&amp;/g, '&')
+      .replace(/&lt;/g, '<')
+      .replace(/&gt;/g, '>')
+      .replace(/&quot;/g, '"')
+      .replace(/&#39;/g, "'")
+      .replace(/\s+/g, ' ')
+      .trim()
+    
+    if (id && text.length > 20) {
+      tweets.push({ id, text, link, pubDate, imageUrl })
     }
-    
-    return tweets
-  } catch (error) {
-    console.error('Failed to fetch Festive Owl tweets:', error)
-    return []
   }
+  
+  return tweets
 }
 
 // Check if tweet has already been processed
