@@ -111,14 +111,31 @@ const categoryColors: Record<string, string> = {
   'festival-news': 'bg-pink-500 text-white',
 }
 
-// Process content to add drop cap to first paragraph
+// Process content to add drop cap and ensure proper paragraph formatting
 function processContent(content: string): string {
-  // Find the first <p> tag and add drop cap styling
-  const dropCapContent = content.replace(
+  let processed = content
+  
+  // If content doesn't have <p> tags, wrap paragraphs
+  if (!processed.includes('<p>')) {
+    // Split by double newlines or single newlines
+    const paragraphs = processed.split(/\n\n+|\n/).filter(p => p.trim())
+    processed = paragraphs.map(p => `<p>${p.trim()}</p>`).join('\n')
+  }
+  
+  // Clean up any empty paragraphs
+  processed = processed.replace(/<p>\s*<\/p>/g, '')
+  
+  // Ensure paragraphs aren't nested or malformed
+  processed = processed.replace(/<p><p>/g, '<p>')
+  processed = processed.replace(/<\/p><\/p>/g, '</p>')
+  
+  // Add drop cap to first paragraph
+  processed = processed.replace(
     /<p>([A-Za-z])/,
     '<p><span class="drop-cap">$1</span>'
   )
-  return dropCapContent
+  
+  return processed
 }
 
 export default async function BlogPostPage({ params }: { params: Promise<{ slug: string }> }) {
@@ -183,8 +200,13 @@ export default async function BlogPostPage({ params }: { params: Promise<{ slug:
         }
         
         .article-body p {
-          margin-bottom: 1.5rem;
-          line-height: 1.8;
+          margin-bottom: 1.75rem !important;
+          line-height: 1.85;
+          color: #374151;
+        }
+        
+        .article-body p:last-child {
+          margin-bottom: 0 !important;
         }
         
         .article-body h2 {
