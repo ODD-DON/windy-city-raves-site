@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react'
 import { Button } from '@/components/ui/button'
 import { Loader2, Plus, Edit3, Trash2, Eye, Save, X, Search } from 'lucide-react'
 import Image from 'next/image'
-import { createClient } from '@/lib/supabase/client'
+import { supabaseClient } from '@/lib/supabase/client'
 
 interface BlogPost {
   id: string
@@ -61,7 +61,7 @@ export default function BlogAdminPage() {
     meta_description: '',
   })
 
-  const supabase = createClient()
+  const supabase = supabaseClient
 
   useEffect(() => {
     fetchPosts()
